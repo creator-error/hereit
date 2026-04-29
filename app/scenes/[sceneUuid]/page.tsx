@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { SceneShareControls } from "../_components/SceneShareControls";
 import { SceneViewerClient } from "./SceneViewerClient";
 import { getAppSession } from "@/server/auth/session";
 import { sortRoles } from "@/features/admin/roles";
@@ -118,10 +119,11 @@ export default async function SceneDetailPage({ params }: PageProps) {
                 </dd>
               </div>
             </dl>
-            <div className="mt-8 flex flex-wrap gap-3">
+            <SceneShareControls sceneUuid={scene.uuid} shared={scene.shared} />
+            <div className="mt-3 flex flex-wrap gap-3">
               <Link
                 href="/demo"
-                className="rounded-2xl bg-[#f59e0b] px-4 py-2 text-sm font-medium text-[#111827] transition hover:bg-[#fbbf24]"
+                className="rounded-2xl border border-white/12 bg-white/6 px-4 py-2 text-sm text-white transition hover:bg-white/10"
               >
                 Open Demo
               </Link>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createGroupAction, deleteGroupAction, deleteSceneAction } from "@/app/admin/actions";
+import { SceneShareControls } from "@/app/scenes/_components/SceneShareControls";
 import type { AppGroupSummary } from "@/server/repositories/user-repository";
 
 type AdminGroupSceneBoardProps = {
@@ -218,6 +219,7 @@ export function AdminGroupSceneBoard({
                         </button>
                       </form>
                     </div>
+                    <SceneShareControls compact sceneUuid={scene.uuid} shared={scene.shared} />
                   </section>
                 ))}
               </div>

@@ -45,6 +45,10 @@ export function hasWorkspaceAccess(roles: string[] | undefined): boolean {
   return normalizeRoles(roles).some((role) => WORKSPACE_ACCESS_ROLES.includes(role as RoleName));
 }
 
+export function canEditWorkspace(roles: string[] | undefined): boolean {
+  return normalizeRoles(roles).some((role) => role === "admin" || role === "editor");
+}
+
 export function hasUserAdminAccess(roles: string[] | undefined): boolean {
   return normalizeRoles(roles).some((role) => USER_ADMIN_ACCESS_ROLES.includes(role as RoleName));
 }

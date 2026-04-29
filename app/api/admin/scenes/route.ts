@@ -1,5 +1,5 @@
 import { getAppSession } from "@/server/auth/session";
-import { hasWorkspaceAccess, sortRoles } from "@/features/admin/roles";
+import { canEditWorkspace, hasWorkspaceAccess, sortRoles } from "@/features/admin/roles";
 import {
   createScene,
   listGroupsWithScenesForUser,
@@ -33,7 +33,7 @@ export async function GET() {
 
   const actorRoles = sortRoles(session!.roles ?? []);
 
-  if (!hasWorkspaceAccess(actorRoles)) {
+  if (!canEditWorkspace(actorRoles)) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -92,9 +92,10 @@ export async function POST(request: Request) {
 
     return Response.json({ sceneId }, { status: 201 });
   } catch (error) {
+    const status = error instanceof Error && error.message === "Forbidden" ? 403 : 400;
     return Response.json(
       { error: error instanceof Error ? error.message : "Create failed" },
-      { status: 400 },
+      { status },
     );
   }
 }

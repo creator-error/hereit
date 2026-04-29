@@ -35,9 +35,10 @@ export async function DELETE(_request: Request, context: RouteContext) {
       actorRoles,
     });
   } catch (error) {
+    const status = error instanceof Error && error.message === "Forbidden" ? 403 : 400;
     return Response.json(
       { error: error instanceof Error ? error.message : "Delete failed" },
-      { status: 400 },
+      { status },
     );
   }
 

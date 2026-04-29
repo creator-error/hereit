@@ -1,5 +1,5 @@
 import { getAppSession } from "@/server/auth/session";
-import { hasWorkspaceAccess, sortRoles } from "@/features/admin/roles";
+import { canEditWorkspace, hasWorkspaceAccess, sortRoles } from "@/features/admin/roles";
 import {
   createGroup,
   listGroupsWithScenesForUser,
@@ -29,7 +29,7 @@ export async function GET() {
 
   const actorRoles = sortRoles(session!.roles ?? []);
 
-  if (!hasWorkspaceAccess(actorRoles)) {
+  if (!canEditWorkspace(actorRoles)) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
