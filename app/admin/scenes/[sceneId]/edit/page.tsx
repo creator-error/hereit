@@ -5,7 +5,7 @@ import { getAppSession } from "@/server/auth/session";
 import { hasWorkspaceAccess, sortRoles } from "@/features/admin/roles";
 import {
   getSceneForEdit,
-  listManageableGroupsForUser,
+  listManageableOrganizationsForUser,
 } from "@/server/repositories/user-repository";
 
 type PageProps = {
@@ -28,9 +28,9 @@ export default async function EditScenePage({ params }: PageProps) {
   }
 
   const { sceneId } = await params;
-  const [scene, groups] = await Promise.all([
+  const [scene, organizations] = await Promise.all([
     getSceneForEdit(sceneId),
-    listManageableGroupsForUser({
+    listManageableOrganizationsForUser({
       userId: session.user.id,
       roles: sessionRoles,
     }),
@@ -40,7 +40,7 @@ export default async function EditScenePage({ params }: PageProps) {
     notFound();
   }
 
-  if (groups.length === 0) {
+  if (organizations.length === 0) {
     redirect("/admin");
   }
 
@@ -53,7 +53,7 @@ export default async function EditScenePage({ params }: PageProps) {
             <p className="text-sm uppercase tracking-[0.28em] text-[#f59e0b]">Edit Scene</p>
             <h1 className="mt-3 text-4xl font-semibold">{scene.name}</h1>
           </section>
-          <SceneEditorForm mode="edit" groups={groups} initialValue={scene} />
+          <SceneEditorForm mode="edit" organizations={organizations} initialValue={scene} />
         </div>
       </main>
     </div>

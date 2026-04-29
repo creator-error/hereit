@@ -9,25 +9,22 @@
   "vars": {
     // Runtime vars. Secrets such as AUTH_SECRET and OAuth client secrets
     // should be stored with `wrangler secret put`, not committed here.
-    "NEXTAUTH_URL": "https://<production-host>/auth",
-    "NEXT_PUBLIC_APP_URL": "https://<production-host>"
+    "NEXTAUTH_URL": "https://hereit.aokayama-work.workers.dev/auth",
+    "NEXT_PUBLIC_APP_URL": "https://hereit.aokayama-work.workers.dev"
   },
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "<d1-database-name>",
-      "database_id": "<d1-database-id>"
+      "database_name": "hereit",
+      "database_id": "6f34c2d1-a379-44bf-a6b9-6005996ac466"
     }
   ],
-  // R2 binding is not required by the current implementation because the app
-  // stores direct asset URLs in DB. Keep this block commented until upload or
-  // signed URL issuance is implemented.
-  // "r2_buckets": [
-  //   {
-  //     "binding": "ASSET_BUCKET",
-  //     "bucket_name": "<r2-bucket-name>"
-  //   }
-  // ],
+  "r2_buckets": [
+    {
+      "binding": "ASSET_BUCKET",
+      "bucket_name": "hereit"
+    }
+  ],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"

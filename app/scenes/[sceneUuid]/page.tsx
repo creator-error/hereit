@@ -1,14 +1,13 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { SceneShareControls } from "../_components/SceneShareControls";
-import { SceneAudioEditor } from "./SceneAudioEditor";
-import { SceneViewerClient } from "./SceneViewerClient";
+import { SceneWorkspaceClient } from "./SceneWorkspaceClient";
 import { getAppSession } from "@/server/auth/session";
 import { sortRoles } from "@/features/admin/roles";
 import {
-  getSceneAccessHintByUuid,
-  listAudioPlacementsForSceneUuidActor,
-  getVisibleSceneByUuidForActor,
+  getSceneAccessHintById,
+  listAudioPlacementsForSceneIdActor,
+  getVisibleSceneByIdForActor,
 } from "@/server/repositories/user-repository";
 
 type PageProps = {
@@ -18,7 +17,7 @@ type PageProps = {
 };
 
 export default async function SceneDetailPage({ params }: PageProps) {
-  const { sceneUuid } = await params;
+  const { sceneUuid: sceneId } = await params;
   const session = await getAppSession();
   const actor =
     session?.user?.id
@@ -28,17 +27,17 @@ export default async function SceneDetailPage({ params }: PageProps) {
         }
       : null;
 
-  const scene = await getVisibleSceneByUuidForActor(sceneUuid, actor);
+  const scene = await getVisibleSceneByIdForActor(sceneId, actor);
 
   if (!scene) {
-    const hint = await getSceneAccessHintByUuid(sceneUuid);
+    const hint = await getSceneAccessHintById(sceneId);
 
     if (!hint.exists) {
       notFound();
     }
 
     if (!session?.user?.id && !hint.shared) {
-      redirect(`/login?callbackUrl=/scenes/${sceneUuid}`);
+      redirect(`/login?callbackUrl=/scenes/${sceneId}`);
     }
 
     return (
@@ -68,7 +67,7 @@ export default async function SceneDetailPage({ params }: PageProps) {
     );
   }
 
-  const audioPlacements = (await listAudioPlacementsForSceneUuidActor(sceneUuid, actor)) ?? [];
+  const audioPlacements = (await listAudioPlacementsForSceneIdActor(sceneId, actor)) ?? [];
   const canEditAudio = sessionRolesCanEdit(session?.roles ?? []);
 
   return (
@@ -90,33 +89,28 @@ export default async function SceneDetailPage({ params }: PageProps) {
             >
               {scene.shared ? "Shared" : "Private"}
             </span>
-            {scene.groupName ? (
+            {scene.organizationName ? (
               <span className="rounded-full border border-white/12 bg-white/6 px-3 py-1 text-xs text-white/76">
-                {scene.groupName}
+                {scene.organizationName}
               </span>
             ) : null}
           </div>
         </section>
 
         <section className="grid gap-6 lg:grid-cols-[1.2fr,0.8fr]">
-          <SceneViewerClient
-            audioSources={audioPlacements.map((placement) => ({
-              gain: placement.gain,
-              loop: placement.loop,
-              name: placement.name ?? placement.originalFilename ?? "audio",
-              position: placement.position,
-              url: placement.url,
-            }))}
+          <SceneWorkspaceClient
+            canEdit={canEditAudio}
+            initialPlacements={audioPlacements}
+            sceneId={scene.id}
             splatAssetUrl={scene.roomPlyUrl}
             collisionAssetUrl={scene.roomGlbUrl}
           />
-
           <aside className="rounded-[32px] border border-white/10 bg-[#0c1423] p-8 shadow-2xl shadow-black/20">
             <h2 className="text-xl font-semibold text-white">Assets</h2>
             <dl className="mt-5 space-y-4 text-sm">
               <div>
-                <dt className="text-white/44">Scene UUID</dt>
-                <dd className="mt-1 break-all text-white/78">{scene.uuid}</dd>
+                <dt className="text-white/44">Scene ID</dt>
+                <dd className="mt-1 break-all text-white/78">{scene.id}</dd>
               </div>
               <div>
                 <dt className="text-white/44">PLY URL</dt>
@@ -135,7 +129,7 @@ export default async function SceneDetailPage({ params }: PageProps) {
                 <dd className="mt-1 text-white/78">{audioPlacements.length}</dd>
               </div>
             </dl>
-            <SceneShareControls sceneUuid={scene.uuid} shared={scene.shared} />
+            <SceneShareControls sceneId={scene.id} shared={scene.shared} />
             <div className="mt-3 flex flex-wrap gap-3">
               <Link
                 href="/demo"
@@ -152,12 +146,6 @@ export default async function SceneDetailPage({ params }: PageProps) {
             </div>
           </aside>
         </section>
-
-        <SceneAudioEditor
-          canEdit={canEditAudio}
-          initialPlacements={audioPlacements}
-          sceneUuid={scene.uuid}
-        />
       </div>
     </main>
   );

@@ -1,8 +1,8 @@
 import { getAppSession } from "@/server/auth/session";
 import { sortRoles } from "@/features/admin/roles";
 import {
-  getVisibleSceneByUuidForActor,
-  listAudioPlacementsForSceneUuidActor,
+  getVisibleSceneByIdForActor,
+  listAudioPlacementsForSceneIdActor,
 } from "@/server/repositories/user-repository";
 
 type RouteContext = {
@@ -21,14 +21,14 @@ export async function GET(_request: Request, context: RouteContext) {
         }
       : null;
 
-  const { sceneUuid } = await context.params;
-  const scene = await getVisibleSceneByUuidForActor(sceneUuid, actor);
+  const { sceneUuid: sceneId } = await context.params;
+  const scene = await getVisibleSceneByIdForActor(sceneId, actor);
 
   if (!scene) {
     return Response.json({ error: "Scene not found" }, { status: 404 });
   }
 
-  const audioPlacements = (await listAudioPlacementsForSceneUuidActor(sceneUuid, actor)) ?? [];
+  const audioPlacements = (await listAudioPlacementsForSceneIdActor(sceneId, actor)) ?? [];
 
   return Response.json({ scene, audioPlacements });
 }

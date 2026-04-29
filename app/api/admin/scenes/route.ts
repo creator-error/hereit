@@ -2,11 +2,11 @@ import { getAppSession } from "@/server/auth/session";
 import { canEditWorkspace, hasWorkspaceAccess, sortRoles } from "@/features/admin/roles";
 import {
   createScene,
-  listGroupsWithScenesForUser,
+  listOrganizationsWithScenesForUser,
 } from "@/server/repositories/user-repository";
 
 type SceneBody = {
-  groupId?: unknown;
+  organizationId?: unknown;
   name?: unknown;
   description?: unknown;
   shared?: unknown;
@@ -37,17 +37,17 @@ export async function GET() {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const groups = await listGroupsWithScenesForUser({
+  const organizations = await listOrganizationsWithScenesForUser({
     userId: actorUserId,
     roles: actorRoles,
   });
 
   return Response.json({
-    scenes: groups.flatMap((group) =>
+    scenes: organizations.flatMap((group) =>
       group.scenes.map((scene) => ({
         ...scene,
-        groupId: group.id,
-        groupName: group.name,
+        organizationId: group.id,
+        organizationName: group.name,
       })),
     ),
   });
@@ -74,13 +74,13 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as SceneBody;
 
-  if (typeof body.groupId !== "string" || typeof body.name !== "string" || body.name.trim().length === 0) {
-    return Response.json({ error: "groupId and name are required" }, { status: 400 });
+  if (typeof body.organizationId !== "string" || typeof body.name !== "string" || body.name.trim().length === 0) {
+    return Response.json({ error: "organizationId and name are required" }, { status: 400 });
   }
 
   try {
     const sceneId = await createScene({
-      groupId: body.groupId,
+      organizationId: body.organizationId,
       name: body.name,
       description: typeof body.description === "string" ? body.description.trim() || null : null,
       shared: body.shared === true,

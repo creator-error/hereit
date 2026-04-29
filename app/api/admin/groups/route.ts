@@ -1,11 +1,11 @@
 import { getAppSession } from "@/server/auth/session";
 import { canEditWorkspace, hasWorkspaceAccess, sortRoles } from "@/features/admin/roles";
 import {
-  createGroup,
-  listGroupsWithScenesForUser,
+  createOrganization,
+  listOrganizationsWithScenesForUser,
 } from "@/server/repositories/user-repository";
 
-type GroupBody = {
+type OrganizationBody = {
   name?: unknown;
   description?: unknown;
 };
@@ -33,12 +33,12 @@ export async function GET() {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const groups = await listGroupsWithScenesForUser({
+  const organizations = await listOrganizationsWithScenesForUser({
     userId: actorUserId,
     roles: actorRoles,
   });
 
-  return Response.json({ groups });
+  return Response.json({ organizations });
 }
 
 export async function POST(request: Request) {
@@ -60,17 +60,17 @@ export async function POST(request: Request) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = (await request.json()) as GroupBody;
+  const body = (await request.json()) as OrganizationBody;
 
   if (typeof body.name !== "string" || body.name.trim().length === 0) {
     return Response.json({ error: "name is required" }, { status: 400 });
   }
 
-  const groupId = await createGroup({
+  const organizationId = await createOrganization({
     name: body.name,
     description: typeof body.description === "string" ? body.description.trim() || null : null,
     createdByUserId: actorUserId,
   });
 
-  return Response.json({ groupId }, { status: 201 });
+  return Response.json({ organizationId }, { status: 201 });
 }

@@ -9,7 +9,7 @@ type RouteContext = {
 };
 
 type SceneBody = {
-  groupId?: unknown;
+  organizationId?: unknown;
   name?: unknown;
   description?: unknown;
   shared?: unknown;
@@ -38,14 +38,14 @@ export async function PUT(request: Request, context: RouteContext) {
   const { sceneId } = await context.params;
   const body = (await request.json()) as SceneBody;
 
-  if (typeof body.groupId !== "string" || typeof body.name !== "string" || body.name.trim().length === 0) {
-    return Response.json({ error: "groupId and name are required" }, { status: 400 });
+  if (typeof body.organizationId !== "string" || typeof body.name !== "string" || body.name.trim().length === 0) {
+    return Response.json({ error: "organizationId and name are required" }, { status: 400 });
   }
 
   try {
     await updateScene({
       sceneId,
-      groupId: body.groupId,
+      organizationId: body.organizationId,
       name: body.name,
       description: typeof body.description === "string" ? body.description.trim() || null : null,
       shared: body.shared === true,

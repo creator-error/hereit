@@ -3,11 +3,11 @@ import { AdminHeader } from "../../_components/AdminHeader";
 import { SceneEditorForm } from "../../_components/SceneEditorForm";
 import { getAppSession } from "@/server/auth/session";
 import { hasWorkspaceAccess, sortRoles } from "@/features/admin/roles";
-import { listManageableGroupsForUser } from "@/server/repositories/user-repository";
+import { listManageableOrganizationsForUser } from "@/server/repositories/user-repository";
 
 type PageProps = {
   searchParams: Promise<{
-    groupId?: string;
+    organizationId?: string;
   }>;
 };
 
@@ -24,19 +24,19 @@ export default async function NewScenePage({ searchParams }: PageProps) {
     redirect("/admin");
   }
 
-  const groups = await listManageableGroupsForUser({
+  const organizations = await listManageableOrganizationsForUser({
     userId: session.user.id,
     roles: sessionRoles,
   });
 
-  if (groups.length === 0) {
+  if (organizations.length === 0) {
     redirect("/admin");
   }
 
   const params = await searchParams;
-  const selectedGroupId = groups.some((group) => group.id === params.groupId)
-    ? params.groupId
-    : groups[0]?.id;
+  const selectedOrganizationId = organizations.some((organization) => organization.id === params.organizationId)
+    ? params.organizationId
+    : organizations[0]?.id;
 
   return (
     <div className="min-h-screen bg-[#0b1220] text-white">
@@ -45,16 +45,16 @@ export default async function NewScenePage({ searchParams }: PageProps) {
         <div className="mx-auto max-w-5xl space-y-6">
           <section className="rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.16),_transparent_36%),linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-8 shadow-2xl shadow-black/30">
             <p className="text-sm uppercase tracking-[0.28em] text-sky-300">New Scene</p>
-            <h1 className="mt-3 text-4xl font-semibold">Create a scene inside a group</h1>
+            <h1 className="mt-3 text-4xl font-semibold">Create a scene inside an organization</h1>
           </section>
           <SceneEditorForm
             mode="create"
-            groups={groups}
+            organizations={organizations}
             initialValue={
-              selectedGroupId
+              selectedOrganizationId
                 ? {
                     id: "",
-                    groupId: selectedGroupId,
+                    organizationId: selectedOrganizationId,
                     name: "",
                     description: null,
                     shared: false,

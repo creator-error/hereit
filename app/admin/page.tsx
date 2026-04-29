@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { AdminHeader } from "./_components/AdminHeader";
-import { AdminGroupSceneBoard } from "./_components/AdminGroupSceneBoard";
-import { hasAnyRole, listGroupsWithScenesForUser } from "@/server/repositories/user-repository";
+import { AdminOrganizationSceneBoard } from "./_components/AdminGroupSceneBoard";
+import { hasAnyRole, listOrganizationsWithScenesForUser } from "@/server/repositories/user-repository";
 import { getAppSession } from "@/server/auth/session";
 import { hasWorkspaceAccess, isBootstrapCandidate, sortRoles } from "@/features/admin/roles";
 
@@ -34,7 +34,7 @@ export default async function AdminPage() {
     );
   }
 
-  const groups = await listGroupsWithScenesForUser({
+  const organizations = await listOrganizationsWithScenesForUser({
     userId: session.user.id,
     roles: sessionRoles,
   });
@@ -50,7 +50,7 @@ export default async function AdminPage() {
               `admin` を付与してください。
             </section>
           ) : null}
-          <AdminGroupSceneBoard currentUserRoles={sessionRoles} groups={groups} />
+          <AdminOrganizationSceneBoard currentUserRoles={sessionRoles} organizations={organizations} />
         </div>
       </main>
     </div>

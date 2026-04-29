@@ -1,5 +1,6 @@
 import { normalizeRole, sortRoles } from "@/features/admin/roles";
 import { getRuntimeDatabase } from "@/server/db/runtime";
+import { validateAssetInput } from "@/server/uploads/validation";
 
 type UserRow = {
   id: string;
@@ -20,21 +21,20 @@ export type AppUser = {
   updatedAt: string;
 };
 
-export type AppUserGroupMembership = {
-  groupId: string;
-  groupName: string;
+export type AppUserOrganizationMembership = {
+  organizationId: string;
+  organizationName: string;
   role: string;
 };
 
 export type AppUserDirectoryEntry = AppUser & {
-  groups: AppUserGroupMembership[];
+  organizations: AppUserOrganizationMembership[];
 };
 
 export type AppSceneSummary = {
   id: string;
-  uuid: string;
-  groupId: string;
-  groupName?: string;
+  organizationId: string;
+  organizationName?: string;
   name: string;
   description: string | null;
   shared: boolean;
@@ -65,7 +65,7 @@ export type AppAudioPlacement = {
   loop: boolean;
 };
 
-export type AppGroupSummary = {
+export type AppOrganizationSummary = {
   id: string;
   name: string;
   description: string | null;
@@ -84,12 +84,12 @@ export type SceneAccessHint = {
   shared: boolean;
 };
 
-export type ManageableGroupOption = {
+export type ManageableOrganizationOption = {
   id: string;
   name: string;
 };
 
-export type GroupCatalogEntry = {
+export type OrganizationCatalogEntry = {
   id: string;
   name: string;
   description: string | null;
@@ -101,6 +101,9 @@ type UpsertGoogleUserInput = {
   displayName?: string | null;
   avatarUrl?: string | null;
 };
+
+const SHORT_ID_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ";
+const DEFAULT_SHORT_ID_LENGTH = 12;
 
 const createUsersTableSql = `
   CREATE TABLE IF NOT EXISTS users (
@@ -147,34 +150,32 @@ const createUserRolesTableSql = `
   )
 `;
 
-const createGroupsTableSql = `
-  CREATE TABLE IF NOT EXISTS groups (
+const createOrganizationsTableSql = `
+  CREATE TABLE IF NOT EXISTS organizations (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    slug TEXT NOT NULL UNIQUE,
     description TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   )
 `;
 
-const createGroupMembershipsTableSql = `
-  CREATE TABLE IF NOT EXISTS group_memberships (
+const createOrganizationMembershipsTableSql = `
+  CREATE TABLE IF NOT EXISTS organization_memberships (
     user_id TEXT NOT NULL,
-    group_id TEXT NOT NULL,
+    organization_id TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'viewer',
     created_at TEXT NOT NULL,
-    PRIMARY KEY (user_id, group_id),
+    PRIMARY KEY (user_id, organization_id),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
+    FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
   )
 `;
 
 const createScenesTableSql = `
   CREATE TABLE IF NOT EXISTS scenes (
     id TEXT PRIMARY KEY,
-    uuid TEXT NOT NULL UNIQUE,
-    group_id TEXT NOT NULL,
+    organization_id TEXT NOT NULL,
     name TEXT NOT NULL,
     description TEXT,
     shared INTEGER NOT NULL DEFAULT 0,
@@ -183,14 +184,14 @@ const createScenesTableSql = `
     created_by_user_id TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
+    FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
     FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
   )
 `;
 
-const createScenesGroupIndexSql = `
-  CREATE INDEX IF NOT EXISTS scenes_group_id_idx
-  ON scenes (group_id)
+const createScenesOrganizationIndexSql = `
+  CREATE INDEX IF NOT EXISTS scenes_organization_id_idx
+  ON scenes (organization_id)
 `;
 
 const createAssetsTableSql = `
@@ -274,10 +275,10 @@ type UserListRow = UserRow & {
   roles: string | null;
 };
 
-type GroupMembershipRow = {
+type OrganizationMembershipRow = {
   user_id: string;
-  group_id: string;
-  group_name: string;
+  organization_id: string;
+  organization_name: string;
   role: string | null;
 };
 
@@ -300,7 +301,7 @@ type AudioPlacementRow = {
   loop_enabled: number;
 };
 
-type GroupSummaryRow = {
+type OrganizationSummaryRow = {
   id: string;
   name: string;
   description: string | null;
@@ -309,8 +310,7 @@ type GroupSummaryRow = {
 
 type SceneSummaryRow = {
   id: string;
-  uuid: string;
-  group_id: string;
+  organization_id: string;
   name: string;
   description: string | null;
   shared: number;
@@ -348,22 +348,64 @@ async function ensureAuthSchema() {
   await db.exec(createAuthIdentitiesTableSql);
   await db.exec(createAuthIdentitiesUniqueIndexSql);
   await db.exec(createUserRolesTableSql);
-  await db.exec(createGroupsTableSql);
-  await db.exec(createGroupMembershipsTableSql);
+  await db.exec(createOrganizationsTableSql);
+  await db.exec(createOrganizationMembershipsTableSql);
   await db.exec(createScenesTableSql);
-  await db.exec(createScenesGroupIndexSql);
+  await db.exec(createScenesOrganizationIndexSql);
   await db.exec(createAssetsTableSql);
   await db.exec(createAssetsSceneKindIndexSql);
   await db.exec(createAudioFilesTableSql);
   await db.exec(createAudioFilesSceneIndexSql);
   await db.exec(createAudioPlacementsTableSql);
   await db.exec(createAudioPlacementsSceneIndexSql);
-  await ensureColumnExists("group_memberships", "role", "TEXT NOT NULL DEFAULT 'viewer'");
+  await ensureColumnExists("organization_memberships", "role", "TEXT NOT NULL DEFAULT 'viewer'");
   await ensureColumnExists("scenes", "shared", "INTEGER NOT NULL DEFAULT 0");
-  await db.run("UPDATE group_memberships SET role = 'viewer' WHERE role IS NULL");
+  await db.run("UPDATE organization_memberships SET role = 'viewer' WHERE role IS NULL");
   await db.run("UPDATE scenes SET shared = 0 WHERE shared IS NULL");
 
   return db;
+}
+
+function createShortId(length = DEFAULT_SHORT_ID_LENGTH): string {
+  const randomBytes = crypto.getRandomValues(new Uint8Array(length));
+
+  return Array.from(randomBytes, (byte) => SHORT_ID_ALPHABET[byte % SHORT_ID_ALPHABET.length]).join("");
+}
+
+async function generateUniqueShortId(
+  exists: (candidate: string) => Promise<boolean>,
+  length = DEFAULT_SHORT_ID_LENGTH,
+): Promise<string> {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const candidate = createShortId(length);
+
+    if (!(await exists(candidate))) {
+      return candidate;
+    }
+  }
+
+  throw new Error("Could not allocate unique short id");
+}
+
+export function generateShortId(length = DEFAULT_SHORT_ID_LENGTH): string {
+  return createShortId(length);
+}
+
+export async function createUniqueSceneId(): Promise<string> {
+  const db = await ensureAuthSchema();
+  return generateUniqueShortId(async (candidate) => {
+    const existing = await db.first<{ id: string }>(
+      `
+        SELECT id
+        FROM scenes
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [candidate],
+    );
+
+    return Boolean(existing);
+  });
 }
 
 async function getUserRowById(userId: string): Promise<UserRow | null> {
@@ -462,29 +504,29 @@ export async function listUsersWithMemberships(): Promise<AppUserDirectoryEntry[
     listUsersWithRoles(),
     (async () => {
       const db = await ensureAuthSchema();
-      return db.all<GroupMembershipRow>(
+      return db.all<OrganizationMembershipRow>(
         `
           SELECT
             gm.user_id,
-            gm.group_id,
-            g.name AS group_name,
+            gm.organization_id,
+            g.name AS organization_name,
             gm.role
-          FROM group_memberships gm
-          INNER JOIN groups g
-            ON g.id = gm.group_id
+          FROM organization_memberships gm
+          INNER JOIN organizations g
+            ON g.id = gm.organization_id
           ORDER BY g.name ASC
         `,
       );
     })(),
   ]);
 
-  const membershipsByUserId = new Map<string, AppUserGroupMembership[]>();
+  const membershipsByUserId = new Map<string, AppUserOrganizationMembership[]>();
 
   for (const row of membershipRows) {
     const current = membershipsByUserId.get(row.user_id) ?? [];
     current.push({
-      groupId: row.group_id,
-      groupName: row.group_name,
+      organizationId: row.organization_id,
+      organizationName: row.organization_name,
       role: normalizeRole(row.role ?? "viewer"),
     });
     membershipsByUserId.set(row.user_id, current);
@@ -492,7 +534,7 @@ export async function listUsersWithMemberships(): Promise<AppUserDirectoryEntry[
 
   return users.map((user) => ({
     ...user,
-    groups: membershipsByUserId.get(user.id) ?? [],
+    organizations: membershipsByUserId.get(user.id) ?? [],
   }));
 }
 
@@ -561,61 +603,60 @@ export async function replaceUserRoles(userId: string, roles: string[]): Promise
   return normalizeUser(user, normalizedRoles);
 }
 
-export async function listGroupsWithScenesForUser(input: {
+export async function listOrganizationsWithScenesForUser(input: {
   userId: string;
   roles: string[];
-}): Promise<AppGroupSummary[]> {
+}): Promise<AppOrganizationSummary[]> {
   const db = await ensureAuthSchema();
   const actorRoles = sortRoles(input.roles);
 
-  const visibleGroupIds =
+  const visibleOrganizationIds =
     actorRoles.includes("admin")
       ? null
       : (
-          await db.all<{ group_id: string }>(
+          await db.all<{ organization_id: string }>(
             `
-              SELECT group_id
-              FROM group_memberships
+              SELECT organization_id
+              FROM organization_memberships
               WHERE user_id = ?
-              ORDER BY group_id ASC
+              ORDER BY organization_id ASC
             `,
             [input.userId],
           )
-        ).map((row) => row.group_id);
+        ).map((row) => row.organization_id);
 
-  if (visibleGroupIds && visibleGroupIds.length === 0) {
+  if (visibleOrganizationIds && visibleOrganizationIds.length === 0) {
     return [];
   }
 
-  const groupFilterSql = visibleGroupIds
-    ? `WHERE g.id IN (${visibleGroupIds.map(() => "?").join(", ")})`
+  const groupFilterSql = visibleOrganizationIds
+    ? `WHERE g.id IN (${visibleOrganizationIds.map(() => "?").join(", ")})`
     : "";
-  const groupRows = await db.all<GroupSummaryRow>(
+  const groupRows = await db.all<OrganizationSummaryRow>(
     `
       SELECT
         g.id,
         g.name,
         g.description,
         COUNT(DISTINCT gm.user_id) AS members_count
-      FROM groups g
-      LEFT JOIN group_memberships gm
-        ON gm.group_id = g.id
+      FROM organizations g
+      LEFT JOIN organization_memberships gm
+        ON gm.organization_id = g.id
       ${groupFilterSql}
       GROUP BY g.id, g.name, g.description
       ORDER BY g.name ASC
     `,
-    visibleGroupIds ?? [],
+    visibleOrganizationIds ?? [],
   );
 
-  const sceneFilterSql = visibleGroupIds
-    ? `WHERE s.group_id IN (${visibleGroupIds.map(() => "?").join(", ")})`
+  const sceneFilterSql = visibleOrganizationIds
+    ? `WHERE s.organization_id IN (${visibleOrganizationIds.map(() => "?").join(", ")})`
     : "";
   const sceneRows = await db.all<SceneSummaryRow>(
     `
       SELECT
         s.id,
-        s.uuid,
-        s.group_id,
+        s.organization_id,
         s.name,
         s.description,
         s.shared,
@@ -625,28 +666,27 @@ export async function listGroupsWithScenesForUser(input: {
       ${sceneFilterSql}
       ORDER BY s.name ASC
     `,
-    visibleGroupIds ?? [],
+    visibleOrganizationIds ?? [],
   );
 
-  const scenesByGroupId = new Map<string, AppSceneSummary[]>();
+  const scenesByOrganizationId = new Map<string, AppSceneSummary[]>();
 
   for (const row of sceneRows) {
-    const current = scenesByGroupId.get(row.group_id) ?? [];
+    const current = scenesByOrganizationId.get(row.organization_id) ?? [];
     current.push({
       id: row.id,
-      uuid: row.uuid,
-      groupId: row.group_id,
+      organizationId: row.organization_id,
       name: row.name,
       description: row.description,
       shared: row.shared === 1,
       roomPlyUrl: row.room_ply_url,
       roomGlbUrl: row.room_glb_url,
     });
-    scenesByGroupId.set(row.group_id, current);
+    scenesByOrganizationId.set(row.organization_id, current);
   }
 
   return groupRows.map((row) => {
-    const scenes = scenesByGroupId.get(row.id) ?? [];
+    const scenes = scenesByOrganizationId.get(row.id) ?? [];
     return {
       id: row.id,
       name: row.name,
@@ -658,7 +698,7 @@ export async function listGroupsWithScenesForUser(input: {
   });
 }
 
-async function listAccessibleGroupIdsForActor(actor: SceneAccessActor): Promise<string[] | null> {
+async function listAccessibleOrganizationIdsForActor(actor: SceneAccessActor): Promise<string[] | null> {
   if (!actor) {
     return [];
   }
@@ -670,39 +710,38 @@ async function listAccessibleGroupIdsForActor(actor: SceneAccessActor): Promise<
   }
 
   const db = await ensureAuthSchema();
-  const rows = await db.all<{ group_id: string }>(
+  const rows = await db.all<{ organization_id: string }>(
     `
-      SELECT group_id
-      FROM group_memberships
+      SELECT organization_id
+      FROM organization_memberships
       WHERE user_id = ?
-      ORDER BY group_id ASC
+      ORDER BY organization_id ASC
     `,
     [actor.userId],
   );
 
-  return rows.map((row) => row.group_id);
+  return rows.map((row) => row.organization_id);
 }
 
 export async function listVisibleScenesForActor(actor: SceneAccessActor): Promise<AppSceneSummary[]> {
   const db = await ensureAuthSchema();
-  const accessibleGroupIds = await listAccessibleGroupIdsForActor(actor);
+  const accessibleOrganizationIds = await listAccessibleOrganizationIdsForActor(actor);
 
-  if (accessibleGroupIds && accessibleGroupIds.length === 0) {
-    const publicRows = await db.all<(SceneSummaryRow & { group_name: string })>(
+  if (accessibleOrganizationIds && accessibleOrganizationIds.length === 0) {
+    const publicRows = await db.all<(SceneSummaryRow & { organization_name: string })>(
       `
         SELECT
           s.id,
-          s.uuid,
-          s.group_id,
-          g.name AS group_name,
+          s.organization_id,
+          g.name AS organization_name,
           s.name,
           s.description,
           s.shared,
           s.room_ply_url,
           s.room_glb_url
         FROM scenes s
-        INNER JOIN groups g
-          ON g.id = s.group_id
+        INNER JOIN organizations g
+          ON g.id = s.organization_id
         WHERE s.shared = 1
         ORDER BY g.name ASC, s.name ASC
       `,
@@ -710,9 +749,8 @@ export async function listVisibleScenesForActor(actor: SceneAccessActor): Promis
 
     return publicRows.map((row) => ({
       id: row.id,
-      uuid: row.uuid,
-      groupId: row.group_id,
-      groupName: row.group_name,
+      organizationId: row.organization_id,
+      organizationName: row.organization_name,
       name: row.name,
       description: row.description,
       shared: row.shared === 1,
@@ -722,36 +760,34 @@ export async function listVisibleScenesForActor(actor: SceneAccessActor): Promis
   }
 
   const whereClause =
-    accessibleGroupIds === null
+    accessibleOrganizationIds === null
       ? ""
-      : `WHERE s.shared = 1 OR s.group_id IN (${accessibleGroupIds.map(() => "?").join(", ")})`;
+      : `WHERE s.shared = 1 OR s.organization_id IN (${accessibleOrganizationIds.map(() => "?").join(", ")})`;
 
-  const rows = await db.all<(SceneSummaryRow & { group_name: string })>(
+  const rows = await db.all<(SceneSummaryRow & { organization_name: string })>(
     `
       SELECT
         s.id,
-        s.uuid,
-        s.group_id,
-        g.name AS group_name,
+        s.organization_id,
+        g.name AS organization_name,
         s.name,
         s.description,
         s.shared,
         s.room_ply_url,
         s.room_glb_url
       FROM scenes s
-      INNER JOIN groups g
-        ON g.id = s.group_id
+      INNER JOIN organizations g
+        ON g.id = s.organization_id
       ${whereClause}
       ORDER BY g.name ASC, s.name ASC
     `,
-    accessibleGroupIds ?? [],
+    accessibleOrganizationIds ?? [],
   );
 
   return rows.map((row) => ({
     id: row.id,
-    uuid: row.uuid,
-    groupId: row.group_id,
-    groupName: row.group_name,
+    organizationId: row.organization_id,
+    organizationName: row.organization_name,
     name: row.name,
     description: row.description,
     shared: row.shared === 1,
@@ -760,34 +796,33 @@ export async function listVisibleScenesForActor(actor: SceneAccessActor): Promis
   }));
 }
 
-export async function getVisibleSceneByUuidForActor(
-  sceneUuid: string,
+export async function getVisibleSceneByIdForActor(
+  sceneId: string,
   actor: SceneAccessActor,
 ): Promise<AppSceneSummary | null> {
   const db = await ensureAuthSchema();
-  const accessibleGroupIds = await listAccessibleGroupIdsForActor(actor);
+  const accessibleOrganizationIds = await listAccessibleOrganizationIdsForActor(actor);
 
-  if (accessibleGroupIds && accessibleGroupIds.length === 0) {
-    const row = await db.first<(SceneSummaryRow & { group_name: string })>(
+  if (accessibleOrganizationIds && accessibleOrganizationIds.length === 0) {
+    const row = await db.first<(SceneSummaryRow & { organization_name: string })>(
       `
         SELECT
           s.id,
-          s.uuid,
-          s.group_id,
-          g.name AS group_name,
+          s.organization_id,
+          g.name AS organization_name,
           s.name,
           s.description,
           s.shared,
           s.room_ply_url,
           s.room_glb_url
         FROM scenes s
-        INNER JOIN groups g
-          ON g.id = s.group_id
-        WHERE s.uuid = ?
+        INNER JOIN organizations g
+          ON g.id = s.organization_id
+        WHERE s.id = ?
           AND s.shared = 1
         LIMIT 1
       `,
-      [sceneUuid],
+      [sceneId],
     );
 
     if (!row) {
@@ -796,9 +831,8 @@ export async function getVisibleSceneByUuidForActor(
 
     return {
       id: row.id,
-      uuid: row.uuid,
-      groupId: row.group_id,
-      groupName: row.group_name,
+      organizationId: row.organization_id,
+      organizationName: row.organization_name,
       name: row.name,
       description: row.description,
       shared: row.shared === 1,
@@ -808,25 +842,24 @@ export async function getVisibleSceneByUuidForActor(
   }
 
   const whereClause =
-    accessibleGroupIds === null
-      ? "WHERE s.uuid = ?"
-      : `WHERE s.uuid = ? AND (s.shared = 1 OR s.group_id IN (${accessibleGroupIds.map(() => "?").join(", ")}))`;
-  const params = accessibleGroupIds === null ? [sceneUuid] : [sceneUuid, ...accessibleGroupIds];
-  const row = await db.first<(SceneSummaryRow & { group_name: string })>(
+    accessibleOrganizationIds === null
+      ? "WHERE s.id = ?"
+      : `WHERE s.id = ? AND (s.shared = 1 OR s.organization_id IN (${accessibleOrganizationIds.map(() => "?").join(", ")}))`;
+  const params = accessibleOrganizationIds === null ? [sceneId] : [sceneId, ...accessibleOrganizationIds];
+  const row = await db.first<(SceneSummaryRow & { organization_name: string })>(
     `
       SELECT
         s.id,
-        s.uuid,
-        s.group_id,
-        g.name AS group_name,
+        s.organization_id,
+        g.name AS organization_name,
         s.name,
         s.description,
         s.shared,
         s.room_ply_url,
         s.room_glb_url
       FROM scenes s
-      INNER JOIN groups g
-        ON g.id = s.group_id
+      INNER JOIN organizations g
+        ON g.id = s.organization_id
       ${whereClause}
       LIMIT 1
     `,
@@ -839,9 +872,8 @@ export async function getVisibleSceneByUuidForActor(
 
   return {
     id: row.id,
-    uuid: row.uuid,
-    groupId: row.group_id,
-    groupName: row.group_name,
+    organizationId: row.organization_id,
+    organizationName: row.organization_name,
     name: row.name,
     description: row.description,
     shared: row.shared === 1,
@@ -850,16 +882,16 @@ export async function getVisibleSceneByUuidForActor(
   };
 }
 
-export async function getSceneAccessHintByUuid(sceneUuid: string): Promise<SceneAccessHint> {
+export async function getSceneAccessHintById(sceneId: string): Promise<SceneAccessHint> {
   const db = await ensureAuthSchema();
   const row = await db.first<{ shared: number }>(
     `
       SELECT shared
       FROM scenes
-      WHERE uuid = ?
+      WHERE id = ?
       LIMIT 1
     `,
-    [sceneUuid],
+    [sceneId],
   );
 
   if (!row) {
@@ -900,11 +932,11 @@ function mapAudioPlacementRow(row: AudioPlacementRow): AppAudioPlacement {
   };
 }
 
-export async function listAudioPlacementsForSceneUuidActor(
-  sceneUuid: string,
+export async function listAudioPlacementsForSceneIdActor(
+  sceneId: string,
   actor: SceneAccessActor,
 ): Promise<AppAudioPlacement[] | null> {
-  const scene = await getVisibleSceneByUuidForActor(sceneUuid, actor);
+  const scene = await getVisibleSceneByIdForActor(sceneId, actor);
 
   if (!scene) {
     return null;
@@ -942,8 +974,8 @@ export async function listAudioPlacementsForSceneUuidActor(
   return rows.map(mapAudioPlacementRow);
 }
 
-export async function replaceAudioPlacementsForSceneUuid(input: {
-  sceneUuid: string;
+export async function replaceAudioPlacementsForSceneId(input: {
+  sceneId: string;
   actorUserId: string;
   actorRoles: string[];
   placements: Array<{
@@ -967,24 +999,24 @@ export async function replaceAudioPlacementsForSceneUuid(input: {
   }>;
 }): Promise<AppAudioPlacement[]> {
   const db = await ensureAuthSchema();
-  const scene = await db.first<{ id: string; group_id: string }>(
+  const scene = await db.first<{ id: string; organization_id: string }>(
     `
-      SELECT id, group_id
+      SELECT id, organization_id
       FROM scenes
-      WHERE uuid = ?
+      WHERE id = ?
       LIMIT 1
     `,
-    [input.sceneUuid],
+    [input.sceneId],
   );
 
   if (!scene) {
     throw new Error("Scene not found");
   }
 
-  const allowed = await canManageGroup({
+  const allowed = await canManageOrganization({
     userId: input.actorUserId,
     roles: input.actorRoles,
-    groupId: scene.group_id,
+    organizationId: scene.organization_id,
   });
 
   if (!allowed) {
@@ -1026,6 +1058,15 @@ export async function replaceAudioPlacementsForSceneUuid(input: {
         Number.isFinite(placement.rotation.z) &&
         Number.isFinite(placement.gain),
     );
+
+  for (const placement of normalizedPlacements) {
+    validateAssetInput({
+      kind: "audio",
+      urlOrFilename: placement.url,
+      mimeType: placement.mimeType,
+      byteSize: placement.byteSize,
+    });
+  }
 
   await db.run("DELETE FROM audio_placements WHERE scene_id = ?", [scene.id]);
   await db.run("DELETE FROM audio_files WHERE scene_id = ?", [scene.id]);
@@ -1142,18 +1183,18 @@ export async function replaceAudioPlacementsForSceneUuid(input: {
   return rows.map(mapAudioPlacementRow);
 }
 
-export async function listManageableGroupsForUser(input: {
+export async function listManageableOrganizationsForUser(input: {
   userId: string;
   roles: string[];
-}): Promise<ManageableGroupOption[]> {
+}): Promise<ManageableOrganizationOption[]> {
   const db = await ensureAuthSchema();
   const actorRoles = sortRoles(input.roles);
 
   if (actorRoles.includes("admin")) {
-    return db.all<ManageableGroupOption>(
+    return db.all<ManageableOrganizationOption>(
       `
         SELECT id, name
-        FROM groups
+        FROM organizations
         ORDER BY name ASC
       `,
     );
@@ -1163,12 +1204,12 @@ export async function listManageableGroupsForUser(input: {
     return [];
   }
 
-  return db.all<ManageableGroupOption>(
+  return db.all<ManageableOrganizationOption>(
     `
       SELECT g.id, g.name
-      FROM group_memberships gm
-      INNER JOIN groups g
-        ON g.id = gm.group_id
+      FROM organization_memberships gm
+      INNER JOIN organizations g
+        ON g.id = gm.organization_id
       WHERE gm.user_id = ?
         AND gm.role IN ('admin', 'editor')
       ORDER BY g.name ASC
@@ -1177,12 +1218,12 @@ export async function listManageableGroupsForUser(input: {
   );
 }
 
-export async function listAllGroups(): Promise<GroupCatalogEntry[]> {
+export async function listAllOrganizations(): Promise<OrganizationCatalogEntry[]> {
   const db = await ensureAuthSchema();
-  return db.all<GroupCatalogEntry>(
+  return db.all<OrganizationCatalogEntry>(
     `
       SELECT id, name, description
-      FROM groups
+      FROM organizations
       ORDER BY name ASC
     `,
   );
@@ -1191,8 +1232,7 @@ export async function listAllGroups(): Promise<GroupCatalogEntry[]> {
 export async function getSceneForEdit(sceneId: string): Promise<
   | {
       id: string;
-      uuid: string;
-      groupId: string;
+      organizationId: string;
       name: string;
       description: string | null;
       shared: boolean;
@@ -1206,8 +1246,7 @@ export async function getSceneForEdit(sceneId: string): Promise<
     `
       SELECT
         id,
-        uuid,
-        group_id,
+        organization_id,
         name,
         description,
         shared,
@@ -1225,8 +1264,7 @@ export async function getSceneForEdit(sceneId: string): Promise<
 
   return {
     id: row.id,
-    uuid: row.uuid,
-    groupId: row.group_id,
+    organizationId: row.organization_id,
     name: row.name,
     description: row.description,
     shared: row.shared === 1,
@@ -1235,20 +1273,10 @@ export async function getSceneForEdit(sceneId: string): Promise<
   };
 }
 
-function slugifyGroupName(name: string): string {
-  const base = name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  return base || `group-${crypto.randomUUID().slice(0, 8)}`;
-}
-
-async function canManageGroup(input: {
+async function canManageOrganization(input: {
   userId: string;
   roles: string[];
-  groupId: string;
+  organizationId: string;
 }): Promise<boolean> {
   const actorRoles = sortRoles(input.roles);
 
@@ -1264,102 +1292,96 @@ async function canManageGroup(input: {
   const match = await db.first<{ present: number }>(
     `
       SELECT 1 AS present
-      FROM group_memberships
+      FROM organization_memberships
       WHERE user_id = ?
-        AND group_id = ?
+        AND organization_id = ?
         AND role IN ('admin', 'editor')
       LIMIT 1
     `,
-    [input.userId, input.groupId],
+    [input.userId, input.organizationId],
   );
 
   return match?.present === 1;
 }
 
-export async function createGroup(input: {
+export async function createOrganization(input: {
   name: string;
   description: string | null;
   createdByUserId: string;
 }): Promise<string> {
   const db = await ensureAuthSchema();
   const now = new Date().toISOString();
-  const groupId = crypto.randomUUID();
-  const slugBase = slugifyGroupName(input.name);
-  let slug = slugBase;
-  let suffix = 1;
-
-  while (
-    await db.first<{ id: string }>(
+  const organizationId = await generateUniqueShortId(async (candidate) => {
+    const existing = await db.first<{ id: string }>(
       `
         SELECT id
-        FROM groups
-        WHERE slug = ?
+        FROM organizations
+        WHERE id = ?
         LIMIT 1
       `,
-      [slug],
-    )
-  ) {
-    suffix += 1;
-    slug = `${slugBase}-${suffix}`;
-  }
+      [candidate],
+    );
+
+    return Boolean(existing);
+  });
 
   await db.run(
     `
-      INSERT INTO groups (
+      INSERT INTO organizations (
         id,
         name,
-        slug,
         description,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?)
     `,
-    [groupId, input.name.trim(), slug, input.description, now, now],
+    [organizationId, input.name.trim(), input.description, now, now],
   );
 
   await db.run(
     `
-      INSERT INTO group_memberships (user_id, group_id, role, created_at)
+      INSERT INTO organization_memberships (user_id, organization_id, role, created_at)
       VALUES (?, ?, 'admin', ?)
     `,
-    [input.createdByUserId, groupId, now],
+    [input.createdByUserId, organizationId, now],
   );
 
-  return groupId;
+  return organizationId;
 }
 
-export async function deleteGroup(input: {
-  groupId: string;
+export async function deleteOrganization(input: {
+  organizationId: string;
   actorUserId: string;
   actorRoles: string[];
 }): Promise<void> {
   if (!sortRoles(input.actorRoles).includes("admin")) {
-    throw new Error("Only admins can delete groups");
+    throw new Error("Only admins can delete organizations");
   }
 
   const db = await ensureAuthSchema();
   const counts = await db.first<{ members_count: number; scenes_count: number }>(
     `
       SELECT
-        (SELECT COUNT(*) FROM group_memberships WHERE group_id = ?) AS members_count,
-        (SELECT COUNT(*) FROM scenes WHERE group_id = ?) AS scenes_count
+        (SELECT COUNT(*) FROM organization_memberships WHERE organization_id = ?) AS members_count,
+        (SELECT COUNT(*) FROM scenes WHERE organization_id = ?) AS scenes_count
     `,
-    [input.groupId, input.groupId],
+    [input.organizationId, input.organizationId],
   );
 
   if (!counts) {
-    throw new Error("Group not found");
+    throw new Error("Organization not found");
   }
 
   if (counts.members_count > 0 || counts.scenes_count > 0) {
-    throw new Error("Group with members or scenes cannot be deleted");
+    throw new Error("Organization with members or scenes cannot be deleted");
   }
 
-  await db.run("DELETE FROM groups WHERE id = ?", [input.groupId]);
+  await db.run("DELETE FROM organizations WHERE id = ?", [input.organizationId]);
 }
 
 export async function createScene(input: {
-  groupId: string;
+  sceneId?: string;
+  organizationId: string;
   name: string;
   description: string | null;
   shared: boolean;
@@ -1368,10 +1390,10 @@ export async function createScene(input: {
   actorUserId: string;
   actorRoles: string[];
 }): Promise<string> {
-  const allowed = await canManageGroup({
+  const allowed = await canManageOrganization({
     userId: input.actorUserId,
     roles: input.actorRoles,
-    groupId: input.groupId,
+    organizationId: input.organizationId,
   });
 
   if (!allowed) {
@@ -1380,15 +1402,27 @@ export async function createScene(input: {
 
   const db = await ensureAuthSchema();
   const now = new Date().toISOString();
-  const sceneId = crypto.randomUUID();
-  const sceneUuid = crypto.randomUUID();
+  const sceneId =
+    input.sceneId ??
+    (await generateUniqueShortId(async (candidate) => {
+      const existing = await db.first<{ id: string }>(
+        `
+          SELECT id
+          FROM scenes
+          WHERE id = ?
+          LIMIT 1
+        `,
+        [candidate],
+      );
+
+      return Boolean(existing);
+    }));
 
   await db.run(
     `
       INSERT INTO scenes (
         id,
-        uuid,
-        group_id,
+        organization_id,
         name,
         description,
         shared,
@@ -1397,12 +1431,11 @@ export async function createScene(input: {
         created_by_user_id,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       sceneId,
-      sceneUuid,
-      input.groupId,
+      input.organizationId,
       input.name.trim(),
       input.description,
       input.shared ? 1 : 0,
@@ -1419,7 +1452,7 @@ export async function createScene(input: {
 
 export async function updateScene(input: {
   sceneId: string;
-  groupId: string;
+  organizationId: string;
   name: string;
   description: string | null;
   shared: boolean;
@@ -1428,10 +1461,10 @@ export async function updateScene(input: {
   actorUserId: string;
   actorRoles: string[];
 }): Promise<void> {
-  const allowed = await canManageGroup({
+  const allowed = await canManageOrganization({
     userId: input.actorUserId,
     roles: input.actorRoles,
-    groupId: input.groupId,
+    organizationId: input.organizationId,
   });
 
   if (!allowed) {
@@ -1445,7 +1478,7 @@ export async function updateScene(input: {
     `
       UPDATE scenes
       SET
-        group_id = ?,
+        organization_id = ?,
         name = ?,
         description = ?,
         shared = ?,
@@ -1455,7 +1488,7 @@ export async function updateScene(input: {
       WHERE id = ?
     `,
     [
-      input.groupId,
+      input.organizationId,
       input.name.trim(),
       input.description,
       input.shared ? 1 : 0,
@@ -1480,10 +1513,10 @@ export async function deleteScene(input: {
   await db.run("DELETE FROM scenes WHERE id = ?", [input.sceneId]);
 }
 
-export async function replaceUserGroupMemberships(input: {
+export async function replaceUserOrganizationMemberships(input: {
   userId: string;
   memberships: {
-    groupId: string;
+    organizationId: string;
     role: string;
   }[];
 }): Promise<AppUserDirectoryEntry | null> {
@@ -1499,41 +1532,41 @@ export async function replaceUserGroupMemberships(input: {
     new Map(
       input.memberships
         .map((membership) => ({
-          groupId: membership.groupId,
+          organizationId: membership.organizationId,
           role: normalizeRole(membership.role),
         }))
         .filter(
           (membership) =>
-            membership.groupId.trim().length > 0 &&
+            membership.organizationId.trim().length > 0 &&
             ["admin", "editor", "viewer"].includes(membership.role),
         )
-        .map((membership) => [membership.groupId, membership]),
+        .map((membership) => [membership.organizationId, membership]),
     ).values(),
   );
 
-  await db.run("DELETE FROM group_memberships WHERE user_id = ?", [input.userId]);
+  await db.run("DELETE FROM organization_memberships WHERE user_id = ?", [input.userId]);
 
   for (const membership of dedupedMemberships) {
     await db.run(
       `
-        INSERT INTO group_memberships (user_id, group_id, role, created_at)
+        INSERT INTO organization_memberships (user_id, organization_id, role, created_at)
         VALUES (?, ?, ?, ?)
       `,
-      [input.userId, membership.groupId, membership.role, now],
+      [input.userId, membership.organizationId, membership.role, now],
     );
   }
 
   const [updatedUser] = await Promise.all([getUserWithRoles(input.userId)]);
-  const membershipRows = await db.all<GroupMembershipRow>(
+  const membershipRows = await db.all<OrganizationMembershipRow>(
     `
       SELECT
         gm.user_id,
-        gm.group_id,
-        g.name AS group_name,
+        gm.organization_id,
+        g.name AS organization_name,
         gm.role
-      FROM group_memberships gm
-      INNER JOIN groups g
-        ON g.id = gm.group_id
+      FROM organization_memberships gm
+      INNER JOIN organizations g
+        ON g.id = gm.organization_id
       WHERE gm.user_id = ?
       ORDER BY g.name ASC
     `,
@@ -1546,9 +1579,9 @@ export async function replaceUserGroupMemberships(input: {
 
   return {
     ...updatedUser,
-    groups: membershipRows.map((row) => ({
-      groupId: row.group_id,
-      groupName: row.group_name,
+    organizations: membershipRows.map((row) => ({
+      organizationId: row.organization_id,
+      organizationName: row.organization_name,
       role: normalizeRole(row.role ?? "viewer"),
     })),
   };

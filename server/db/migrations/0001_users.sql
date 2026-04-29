@@ -33,29 +33,27 @@ CREATE TABLE IF NOT EXISTS user_roles (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS groups (
+CREATE TABLE IF NOT EXISTS organizations (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  slug TEXT NOT NULL UNIQUE,
   description TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS group_memberships (
+CREATE TABLE IF NOT EXISTS organization_memberships (
   user_id TEXT NOT NULL,
-  group_id TEXT NOT NULL,
+  organization_id TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'viewer',
   created_at TEXT NOT NULL,
-  PRIMARY KEY (user_id, group_id),
+  PRIMARY KEY (user_id, organization_id),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS scenes (
   id TEXT PRIMARY KEY,
-  uuid TEXT NOT NULL UNIQUE,
-  group_id TEXT NOT NULL,
+  organization_id TEXT NOT NULL,
   name TEXT NOT NULL,
   description TEXT,
   shared INTEGER NOT NULL DEFAULT 0,
@@ -64,12 +62,12 @@ CREATE TABLE IF NOT EXISTS scenes (
   created_by_user_id TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
   FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
-CREATE INDEX IF NOT EXISTS scenes_group_id_idx
-  ON scenes (group_id);
+CREATE INDEX IF NOT EXISTS scenes_organization_id_idx
+  ON scenes (organization_id);
 
 CREATE TABLE IF NOT EXISTS assets (
   id TEXT PRIMARY KEY,

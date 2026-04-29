@@ -2,7 +2,7 @@ import { getAppSession } from "@/server/auth/session";
 import { hasUserAdminAccess, sortRoles } from "@/features/admin/roles";
 import {
   hasAnyRole,
-  replaceUserGroupMemberships,
+  replaceUserOrganizationMemberships,
 } from "@/server/repositories/user-repository";
 
 type RouteContext = {
@@ -19,7 +19,7 @@ function isAuthenticated(session: Awaited<ReturnType<typeof getAppSession>>) {
   return Boolean(session?.user?.id);
 }
 
-function parseMemberships(body: MembershipBody): { groupId: string; role: string }[] | null {
+function parseMemberships(body: MembershipBody): { organizationId: string; role: string }[] | null {
   if (!Array.isArray(body.memberships)) {
     return null;
   }
@@ -28,19 +28,19 @@ function parseMemberships(body: MembershipBody): { groupId: string; role: string
     if (
       !entry ||
       typeof entry !== "object" ||
-      typeof (entry as { groupId?: unknown }).groupId !== "string" ||
+      typeof (entry as { organizationId?: unknown }).organizationId !== "string" ||
       typeof (entry as { role?: unknown }).role !== "string"
     ) {
       return null;
     }
 
     return {
-      groupId: (entry as { groupId: string }).groupId,
+      organizationId: (entry as { organizationId: string }).organizationId,
       role: (entry as { role: string }).role,
     };
   });
 
-  return normalized.every(Boolean) ? (normalized as { groupId: string; role: string }[]) : null;
+  return normalized.every(Boolean) ? (normalized as { organizationId: string; role: string }[]) : null;
 }
 
 export async function PUT(request: Request, context: RouteContext) {
@@ -62,13 +62,13 @@ export async function PUT(request: Request, context: RouteContext) {
 
   if (!memberships) {
     return Response.json(
-      { error: "memberships must be an array of { groupId, role }" },
+      { error: "memberships must be an array of { organizationId, role }" },
       { status: 400 },
     );
   }
 
   const { userId } = await context.params;
-  const user = await replaceUserGroupMemberships({
+  const user = await replaceUserOrganizationMemberships({
     userId,
     memberships,
   });

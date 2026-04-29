@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
-
-type EditablePlacement = {
+export type EditableSceneAudioPlacement = {
   id: string;
   name: string;
   url: string;
@@ -25,30 +23,23 @@ type EditablePlacement = {
 
 type SceneAudioEditorProps = {
   canEdit: boolean;
-  initialPlacements: Array<{
-    id: string;
-    name: string | null;
-    url: string;
-    originalFilename: string | null;
-    mimeType: string | null;
-    byteSize: number | null;
-    position: {
-      x: number;
-      y: number;
-      z: number;
-    };
-    rotation: {
-      x: number;
-      y: number;
-      z: number;
-    };
-    gain: number;
-    loop: boolean;
-  }>;
-  sceneUuid: string;
+  onAddPlacement: () => void;
+  onRemovePlacement: (id: string) => void;
+  onSave: () => void;
+  onSelectPlacement: (id: string) => void;
+  onUpdatePlacement: (
+    id: string,
+    updater: (current: EditableSceneAudioPlacement) => EditableSceneAudioPlacement,
+  ) => void;
+  placements: EditableSceneAudioPlacement[];
+  saving: boolean;
+  selectedPlacementId: string | null;
+  status: string | null;
 };
 
-function createEmptyPlacement(): EditablePlacement {
+const POSITION_NUDGE_STEP = 0.25;
+
+export function createEmptyPlacement(): EditableSceneAudioPlacement {
   return {
     id: crypto.randomUUID(),
     name: "",
@@ -63,100 +54,33 @@ function createEmptyPlacement(): EditablePlacement {
   };
 }
 
-function mapPlacement(
-  placement: SceneAudioEditorProps["initialPlacements"][number],
-): EditablePlacement {
-  return {
-    id: placement.id,
-    name: placement.name ?? "",
-    url: placement.url,
-    originalFilename: placement.originalFilename ?? "",
-    mimeType: placement.mimeType ?? "",
-    byteSize: placement.byteSize?.toString() ?? "",
-    position: {
-      x: placement.position.x.toString(),
-      y: placement.position.y.toString(),
-      z: placement.position.z.toString(),
-    },
-    rotation: {
-      x: placement.rotation.x.toString(),
-      y: placement.rotation.y.toString(),
-      z: placement.rotation.z.toString(),
-    },
-    gain: placement.gain.toString(),
-    loop: placement.loop,
-  };
-}
-
 export function SceneAudioEditor({
   canEdit,
-  initialPlacements,
-  sceneUuid,
+  onAddPlacement,
+  onRemovePlacement,
+  onSave,
+  onSelectPlacement,
+  onUpdatePlacement,
+  placements,
+  saving,
+  selectedPlacementId,
+  status,
 }: SceneAudioEditorProps) {
-  const [placements, setPlacements] = useState<EditablePlacement[]>(
-    initialPlacements.map(mapPlacement),
-  );
-  const [status, setStatus] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const selectedPlacement =
+    placements.find((placement) => placement.id === selectedPlacementId) ?? placements[0] ?? null;
 
-  function updatePlacement(
-    id: string,
-    updater: (current: EditablePlacement) => EditablePlacement,
-  ) {
-    setPlacements((current) =>
-      current.map((placement) => (placement.id === id ? updater(placement) : placement)),
-    );
-  }
-
-  async function handleSave() {
-    setSaving(true);
-    setStatus(null);
-
-    try {
-      const response = await fetch(`/api/scenes/${sceneUuid}/audio-placements`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          placements: placements.map((placement) => ({
-            name: placement.name || null,
-            url: placement.url,
-            originalFilename: placement.originalFilename || null,
-            mimeType: placement.mimeType || null,
-            byteSize: placement.byteSize ? Number(placement.byteSize) : null,
-            position: {
-              x: Number(placement.position.x),
-              y: Number(placement.position.y),
-              z: Number(placement.position.z),
-            },
-            rotation: {
-              x: Number(placement.rotation.x),
-              y: Number(placement.rotation.y),
-              z: Number(placement.rotation.z),
-            },
-            gain: Number(placement.gain),
-            loop: placement.loop,
-          })),
-        }),
-      });
-
-      const payload = (await response.json()) as {
-        error?: string;
-        placements?: SceneAudioEditorProps["initialPlacements"];
-      };
-
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Save failed");
-      }
-
-      setPlacements((payload.placements ?? []).map(mapPlacement));
-      setStatus("Saved");
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Save failed");
-    } finally {
-      setSaving(false);
+  function nudgeSelected(axis: "x" | "y" | "z", delta: number) {
+    if (!selectedPlacement || !canEdit) {
+      return;
     }
+
+    onUpdatePlacement(selectedPlacement.id, (current) => ({
+      ...current,
+      position: {
+        ...current.position,
+        [axis]: (Number(current.position[axis]) + delta).toFixed(2),
+      },
+    }));
   }
 
   return (
@@ -165,22 +89,22 @@ export function SceneAudioEditor({
         <div>
           <p className="text-sm uppercase tracking-[0.2em] text-white/46">Audio Placements</p>
           <p className="mt-2 text-sm text-white/68">
-            Scene ごとの audio URL と座標を保存します。Viewer 上のドラッグ編集ではなく、まずは
-            API ベースで再読込できる形を先に入れています。
+            Scene ごとの audio URL と座標を保存します。選択中の音源は viewer に即時反映されるので、
+            URL と座標を調整しながら配置を詰められます。
           </p>
         </div>
         {canEdit ? (
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={() => setPlacements((current) => [...current, createEmptyPlacement()])}
+              onClick={onAddPlacement}
               className="rounded-2xl border border-white/12 bg-white/6 px-4 py-2 text-sm text-white transition hover:bg-white/10"
             >
               Add Audio
             </button>
             <button
               type="button"
-              onClick={handleSave}
+              onClick={onSave}
               disabled={saving}
               className="rounded-2xl bg-[#f59e0b] px-4 py-2 text-sm font-medium text-[#111827] transition hover:bg-[#fbbf24] disabled:cursor-not-allowed disabled:bg-[#475569] disabled:text-white/60"
             >
@@ -192,117 +116,192 @@ export function SceneAudioEditor({
 
       {status ? <p className="mt-4 text-sm text-white/78">{status}</p> : null}
 
-      <div className="mt-6 space-y-4">
-        {placements.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-white/12 bg-white/[0.02] px-5 py-8 text-center text-sm text-white/58">
-            Audio placement はまだありません。
-          </div>
-        ) : null}
-
-        {placements.map((placement) => (
-          <div
-            key={placement.id}
-            className="rounded-3xl border border-white/10 bg-white/[0.03] p-5"
-          >
-            <div className="grid gap-4 lg:grid-cols-2">
-              <label className="text-sm text-white/72">
-                Name
-                <input
-                  type="text"
-                  value={placement.name}
-                  disabled={!canEdit}
-                  onChange={(event) =>
-                    updatePlacement(placement.id, (current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                  className="mt-2 w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                />
-              </label>
-              <label className="text-sm text-white/72">
-                URL
-                <input
-                  type="text"
-                  value={placement.url}
-                  disabled={!canEdit}
-                  onChange={(event) =>
-                    updatePlacement(placement.id, (current) => ({
-                      ...current,
-                      url: event.target.value,
-                    }))
-                  }
-                  className="mt-2 w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                />
-              </label>
+      <div className="mt-6 grid gap-6 xl:grid-cols-[0.7fr,1.3fr]">
+        <div className="space-y-3">
+          <p className="text-xs uppercase tracking-[0.18em] text-white/42">Sources</p>
+          {placements.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-white/12 bg-white/[0.02] px-5 py-8 text-center text-sm text-white/58">
+              Audio placement はまだありません。
             </div>
+          ) : null}
+          {placements.map((placement, index) => {
+            const active = placement.id === selectedPlacement?.id;
+            return (
+              <button
+                key={placement.id}
+                type="button"
+                onClick={() => onSelectPlacement(placement.id)}
+                className={`w-full rounded-3xl border p-4 text-left transition ${
+                  active
+                    ? "border-sky-300/40 bg-sky-500/10"
+                    : "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"
+                }`}
+              >
+                <p className="text-xs uppercase tracking-[0.18em] text-white/44">
+                  Audio {index + 1}
+                </p>
+                <p className="mt-2 text-base font-medium text-white">
+                  {placement.name || placement.originalFilename || "Untitled audio"}
+                </p>
+                <p className="mt-2 truncate text-xs text-white/56">{placement.url || "No URL"}</p>
+                <p className="mt-3 text-xs text-white/56">
+                  ({placement.position.x}, {placement.position.y}, {placement.position.z})
+                </p>
+              </button>
+            );
+          })}
+        </div>
 
-            <div className="mt-4 grid gap-4 sm:grid-cols-4">
-              {(["x", "y", "z"] as const).map((axis) => (
-                <label key={`pos-${axis}`} className="text-sm text-white/72">
-                  Position {axis.toUpperCase()}
+        <div className="space-y-4">
+          {!selectedPlacement ? null : (
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] text-white/44">
+                    Selected Audio
+                  </p>
+                  <h3 className="mt-2 text-xl font-medium text-white">
+                    {selectedPlacement.name || selectedPlacement.originalFilename || "Untitled audio"}
+                  </h3>
+                </div>
+                {canEdit ? (
+                  <button
+                    type="button"
+                    onClick={() => onRemovePlacement(selectedPlacement.id)}
+                    className="rounded-2xl border border-rose-400/25 bg-rose-500/10 px-4 py-2 text-sm text-rose-100 transition hover:bg-rose-500/20"
+                  >
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                <label className="text-sm text-white/72">
+                  Name
                   <input
-                    type="number"
-                    step="0.01"
-                    value={placement.position[axis]}
+                    type="text"
+                    value={selectedPlacement.name}
                     disabled={!canEdit}
                     onChange={(event) =>
-                      updatePlacement(placement.id, (current) => ({
+                      onUpdatePlacement(selectedPlacement.id, (current) => ({
                         ...current,
-                        position: { ...current.position, [axis]: event.target.value },
+                        name: event.target.value,
                       }))
                     }
                     className="mt-2 w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </label>
-              ))}
-              <label className="text-sm text-white/72">
-                Gain
-                <input
-                  type="number"
-                  step="0.1"
-                  value={placement.gain}
-                  disabled={!canEdit}
-                  onChange={(event) =>
-                    updatePlacement(placement.id, (current) => ({
-                      ...current,
-                      gain: event.target.value,
-                    }))
-                  }
-                  className="mt-2 w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                />
-              </label>
-            </div>
+                <label className="text-sm text-white/72">
+                  URL
+                  <input
+                    type="text"
+                    value={selectedPlacement.url}
+                    disabled={!canEdit}
+                    onChange={(event) =>
+                      onUpdatePlacement(selectedPlacement.id, (current) => ({
+                        ...current,
+                        url: event.target.value,
+                      }))
+                    }
+                    className="mt-2 w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </label>
+              </div>
 
-            <div className="mt-4 flex items-center justify-between gap-4">
-              <label className="flex items-center gap-3 text-sm text-white/72">
-                <input
-                  type="checkbox"
-                  checked={placement.loop}
-                  disabled={!canEdit}
-                  onChange={(event) =>
-                    updatePlacement(placement.id, (current) => ({
-                      ...current,
-                      loop: event.target.checked,
-                    }))
-                  }
-                />
-                Loop
-              </label>
-              {canEdit ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPlacements((current) => current.filter((item) => item.id !== placement.id))
-                  }
-                  className="rounded-2xl border border-rose-400/25 bg-rose-500/10 px-4 py-2 text-sm text-rose-100 transition hover:bg-rose-500/20"
-                >
-                  Remove
-                </button>
-              ) : null}
+              <div className="mt-5 rounded-3xl border border-white/10 bg-[#08111e] p-5">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-white/44">Position</p>
+                    <p className="mt-2 text-sm text-white/60">
+                      調整ボタンは viewer の音源位置へ即時反映されます。
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-4 sm:grid-cols-4">
+                  {(["x", "y", "z"] as const).map((axis) => (
+                    <label key={`pos-${axis}`} className="text-sm text-white/72">
+                      {axis.toUpperCase()}
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={selectedPlacement.position[axis]}
+                        disabled={!canEdit}
+                        onChange={(event) =>
+                          onUpdatePlacement(selectedPlacement.id, (current) => ({
+                            ...current,
+                            position: { ...current.position, [axis]: event.target.value },
+                          }))
+                        }
+                        className="mt-2 w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                      />
+                    </label>
+                  ))}
+                  <label className="text-sm text-white/72">
+                    Gain
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={selectedPlacement.gain}
+                      disabled={!canEdit}
+                      onChange={(event) =>
+                        onUpdatePlacement(selectedPlacement.id, (current) => ({
+                          ...current,
+                          gain: event.target.value,
+                        }))
+                      }
+                      className="mt-2 w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                  </label>
+                </div>
+
+                {canEdit ? (
+                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                    {(["x", "y", "z"] as const).map((axis) => (
+                      <div key={`nudge-${axis}`} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                        <p className="text-xs uppercase tracking-[0.16em] text-white/44">
+                          Move {axis.toUpperCase()}
+                        </p>
+                        <div className="mt-3 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => nudgeSelected(axis, -POSITION_NUDGE_STEP)}
+                            className="flex-1 rounded-xl border border-white/12 bg-white/6 px-3 py-2 text-sm text-white transition hover:bg-white/10"
+                          >
+                            -0.25
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => nudgeSelected(axis, POSITION_NUDGE_STEP)}
+                            className="flex-1 rounded-xl border border-white/12 bg-white/6 px-3 py-2 text-sm text-white transition hover:bg-white/10"
+                          >
+                            +0.25
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="mt-4 flex items-center gap-3">
+                <label className="flex items-center gap-3 text-sm text-white/72">
+                  <input
+                    type="checkbox"
+                    checked={selectedPlacement.loop}
+                    disabled={!canEdit}
+                    onChange={(event) =>
+                      onUpdatePlacement(selectedPlacement.id, (current) => ({
+                        ...current,
+                        loop: event.target.checked,
+                      }))
+                    }
+                  />
+                  Loop
+                </label>
+              </div>
             </div>
-          </div>
-        ))}
+          )}
+        </div>
       </div>
     </section>
   );

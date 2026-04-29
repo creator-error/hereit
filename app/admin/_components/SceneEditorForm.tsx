@@ -1,12 +1,12 @@
 import { createSceneAction, updateSceneAction } from "@/app/admin/actions";
-import type { ManageableGroupOption } from "@/server/repositories/user-repository";
+import type { ManageableOrganizationOption } from "@/server/repositories/user-repository";
 
 type SceneEditorFormProps = {
   mode: "create" | "edit";
-  groups: ManageableGroupOption[];
+  organizations: ManageableOrganizationOption[];
   initialValue?: {
     id: string;
-    groupId: string;
+    organizationId: string;
     name: string;
     description: string | null;
     shared: boolean;
@@ -15,25 +15,29 @@ type SceneEditorFormProps = {
   };
 };
 
-export function SceneEditorForm({ mode, groups, initialValue }: SceneEditorFormProps) {
+export function SceneEditorForm({ mode, organizations, initialValue }: SceneEditorFormProps) {
   const action = mode === "create" ? createSceneAction : updateSceneAction;
 
   return (
-    <form action={action} className="space-y-6 rounded-[32px] border border-white/10 bg-[#0c1423] p-8 shadow-2xl shadow-black/20">
+    <form
+      action={action}
+      encType="multipart/form-data"
+      className="space-y-6 rounded-[32px] border border-white/10 bg-[#0c1423] p-8 shadow-2xl shadow-black/20"
+    >
       {initialValue ? <input type="hidden" name="sceneId" value={initialValue.id} /> : null}
 
       <div className="grid gap-5 lg:grid-cols-2">
         <div>
-          <label className="text-xs uppercase tracking-[0.18em] text-white/44">Group</label>
+          <label className="text-xs uppercase tracking-[0.18em] text-white/44">Organization</label>
           <select
-            name="groupId"
+            name="organizationId"
             required
-            defaultValue={initialValue?.groupId ?? groups[0]?.id ?? ""}
+            defaultValue={initialValue?.organizationId ?? organizations[0]?.id ?? ""}
             className="mt-2 w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
           >
-            {groups.map((group) => (
-              <option key={group.id} value={group.id} className="bg-[#0b1220] text-white">
-                {group.name}
+            {organizations.map((organization) => (
+              <option key={organization.id} value={organization.id} className="bg-[#0b1220] text-white">
+                {organization.name}
               </option>
             ))}
           </select>
@@ -63,28 +67,53 @@ export function SceneEditorForm({ mode, groups, initialValue }: SceneEditorFormP
         />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <div>
-          <label className="text-xs uppercase tracking-[0.18em] text-white/44">PLY URL</label>
-          <input
-            type="url"
-            name="roomPlyUrl"
-            defaultValue={initialValue?.roomPlyUrl ?? ""}
-            className="mt-2 w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
-            placeholder="https://r2.example.com/scenes/room.ply"
-          />
+      {mode === "create" ? (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <div>
+            <label className="text-xs uppercase tracking-[0.18em] text-white/44">PLY File</label>
+            <input
+              type="file"
+              name="roomPlyFile"
+              required
+              accept=".ply,.spz"
+              className="mt-2 block w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none file:mr-4 file:rounded-xl file:border-0 file:bg-[#f59e0b] file:px-3 file:py-2 file:text-sm file:font-medium file:text-[#111827]"
+            />
+          </div>
+          <div>
+            <label className="text-xs uppercase tracking-[0.18em] text-white/44">GLB File</label>
+            <input
+              type="file"
+              name="roomGlbFile"
+              required
+              accept=".glb"
+              className="mt-2 block w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none file:mr-4 file:rounded-xl file:border-0 file:bg-[#f59e0b] file:px-3 file:py-2 file:text-sm file:font-medium file:text-[#111827]"
+            />
+          </div>
         </div>
-        <div>
-          <label className="text-xs uppercase tracking-[0.18em] text-white/44">GLB URL</label>
-          <input
-            type="url"
-            name="roomGlbUrl"
-            defaultValue={initialValue?.roomGlbUrl ?? ""}
-            className="mt-2 w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
-            placeholder="https://r2.example.com/scenes/room.glb"
-          />
+      ) : (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <div>
+            <label className="text-xs uppercase tracking-[0.18em] text-white/44">PLY URL</label>
+            <input
+              type="url"
+              name="roomPlyUrl"
+              defaultValue={initialValue?.roomPlyUrl ?? ""}
+              className="mt-2 w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
+              placeholder="https://r2.example.com/scenes/room.ply"
+            />
+          </div>
+          <div>
+            <label className="text-xs uppercase tracking-[0.18em] text-white/44">GLB URL</label>
+            <input
+              type="url"
+              name="roomGlbUrl"
+              defaultValue={initialValue?.roomGlbUrl ?? ""}
+              className="mt-2 w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
+              placeholder="https://r2.example.com/scenes/room.glb"
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-white/84">
         <input

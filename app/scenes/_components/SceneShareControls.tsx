@@ -4,24 +4,24 @@ import Link from "next/link";
 import { useState } from "react";
 
 type SceneShareControlsProps = {
-  sceneUuid: string;
+  sceneId: string;
   shared: boolean;
   compact?: boolean;
 };
 
 type CopyState = "idle" | "copied" | "error";
 
-function getSceneUrl(sceneUuid: string) {
-  return `/scenes/${sceneUuid}`;
+function getSceneUrl(sceneId: string) {
+  return `/scenes/${sceneId}`;
 }
 
 export function SceneShareControls({
-  sceneUuid,
+  sceneId,
   shared,
   compact = false,
 }: SceneShareControlsProps) {
   const [copyState, setCopyState] = useState<CopyState>("idle");
-  const scenePath = getSceneUrl(sceneUuid);
+  const scenePath = getSceneUrl(sceneId);
 
   async function handleCopy() {
     if (!shared) {

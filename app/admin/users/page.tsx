@@ -3,7 +3,7 @@ import { AdminHeader } from "../_components/AdminHeader";
 import { AdminRoleEditor } from "../_components/AdminRoleEditor";
 import {
   hasAnyRole,
-  listAllGroups,
+  listAllOrganizations,
   listUsersWithMemberships,
 } from "@/server/repositories/user-repository";
 import { getAppSession } from "@/server/auth/session";
@@ -42,9 +42,9 @@ export default async function AdminUsersPage() {
     );
   }
 
-  const [users, availableGroups] = await Promise.all([
+  const [users, availableOrganizations] = await Promise.all([
     listUsersWithMemberships(),
-    listAllGroups(),
+    listAllOrganizations(),
   ]);
 
   return (
@@ -56,7 +56,7 @@ export default async function AdminUsersPage() {
             <p className="text-sm uppercase tracking-[0.28em] text-sky-300">Users</p>
             <h1 className="mt-3 text-4xl font-semibold">User directory and role controls</h1>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-white/72">
-              名前、メールアドレス、所属グループ、role を一覧し、必要ならここから権限を更新します。
+              名前、メールアドレス、所属 organization、role を一覧し、必要ならここから権限を更新します。
             </p>
           </section>
 
@@ -64,7 +64,7 @@ export default async function AdminUsersPage() {
             currentUserId={session.user.id}
             currentUserRoles={sessionRoles}
             initialUsers={users}
-            availableGroups={availableGroups}
+            availableOrganizations={availableOrganizations}
             bootstrapMode={bootstrapMode}
           />
         </div>

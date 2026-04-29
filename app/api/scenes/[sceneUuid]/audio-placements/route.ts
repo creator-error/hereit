@@ -1,8 +1,8 @@
 import { getAppSession } from "@/server/auth/session";
 import { sortRoles } from "@/features/admin/roles";
 import {
-  listAudioPlacementsForSceneUuidActor,
-  replaceAudioPlacementsForSceneUuid,
+  listAudioPlacementsForSceneIdActor,
+  replaceAudioPlacementsForSceneId,
 } from "@/server/repositories/user-repository";
 
 type RouteContext = {
@@ -43,8 +43,8 @@ export async function GET(_request: Request, context: RouteContext) {
         }
       : null;
 
-  const { sceneUuid } = await context.params;
-  const placements = await listAudioPlacementsForSceneUuidActor(sceneUuid, actor);
+  const { sceneUuid: sceneId } = await context.params;
+  const placements = await listAudioPlacementsForSceneIdActor(sceneId, actor);
 
   if (!placements) {
     return Response.json({ error: "Scene not found" }, { status: 404 });
@@ -60,13 +60,13 @@ export async function PUT(request: Request, context: RouteContext) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { sceneUuid } = await context.params;
+  const { sceneUuid: sceneId } = await context.params;
   const body = (await request.json()) as AudioPlacementBody;
   const placements = Array.isArray(body.placements) ? body.placements : [];
 
   try {
-    const saved = await replaceAudioPlacementsForSceneUuid({
-      sceneUuid,
+    const saved = await replaceAudioPlacementsForSceneId({
+      sceneId,
       actorUserId: session.user.id,
       actorRoles: sortRoles(session.roles ?? []),
       placements: placements.map((placement) => ({

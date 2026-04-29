@@ -20,21 +20,21 @@ type AdminUser = {
   updatedAt: string;
 };
 
-type AdminUserGroup = {
-  groupId: string;
-  groupName: string;
+type AdminUserOrganization = {
+  organizationId: string;
+  organizationName: string;
   role: string;
 };
 
 type AdminDirectoryUser = AdminUser & {
-  groups: AdminUserGroup[];
+  organizations: AdminUserOrganization[];
 };
 
 type AdminRoleEditorProps = {
   currentUserId: string;
   currentUserRoles: string[];
   initialUsers: AdminDirectoryUser[];
-  availableGroups: {
+  availableOrganizations: {
     id: string;
     name: string;
     description: string | null;
@@ -50,7 +50,7 @@ export function AdminRoleEditor({
   currentUserId,
   currentUserRoles,
   initialUsers,
-  availableGroups,
+  availableOrganizations,
   bootstrapMode,
 }: AdminRoleEditorProps) {
   const [users, setUsers] = useState(() =>
@@ -65,7 +65,9 @@ export function AdminRoleEditor({
     Object.fromEntries(
       initialUsers.map((user) => [
         user.id,
-        Object.fromEntries(user.groups.map((group) => [group.groupId, group.role])),
+        Object.fromEntries(
+          user.organizations.map((organization) => [organization.organizationId, organization.role]),
+        ),
       ]),
     ),
   );
@@ -93,14 +95,14 @@ export function AdminRoleEditor({
     });
   };
 
-  const toggleGroupMembership = (userId: string, groupId: string, checked: boolean) => {
+  const toggleOrganizationMembership = (userId: string, organizationId: string, checked: boolean) => {
     setDraftMemberships((current) => {
       const next = { ...(current[userId] ?? {}) };
 
       if (checked) {
-        next[groupId] = next[groupId] ?? "viewer";
+        next[organizationId] = next[organizationId] ?? "viewer";
       } else {
-        delete next[groupId];
+        delete next[organizationId];
       }
 
       return {
@@ -110,12 +112,12 @@ export function AdminRoleEditor({
     });
   };
 
-  const setGroupRole = (userId: string, groupId: string, role: string) => {
+  const setOrganizationRole = (userId: string, organizationId: string, role: string) => {
     setDraftMemberships((current) => ({
       ...current,
       [userId]: {
         ...(current[userId] ?? {}),
-        [groupId]: role,
+        [organizationId]: role,
       },
     }));
   };
@@ -147,7 +149,7 @@ export function AdminRoleEditor({
       const updatedUser: AdminDirectoryUser = {
         ...payload.user,
         roles: sortRoles(payload.user.roles),
-        groups: users.find((user) => user.id === userId)?.groups ?? [],
+        organizations: users.find((user) => user.id === userId)?.organizations ?? [],
       };
 
       setUsers((current) =>
@@ -171,8 +173,8 @@ export function AdminRoleEditor({
   };
 
   const saveMemberships = async (userId: string) => {
-    const memberships = Object.entries(draftMemberships[userId] ?? {}).map(([groupId, role]) => ({
-      groupId,
+    const memberships = Object.entries(draftMemberships[userId] ?? {}).map(([organizationId, role]) => ({
+      organizationId,
       role,
     }));
 
@@ -206,10 +208,10 @@ export function AdminRoleEditor({
       setDraftMemberships((current) => ({
         ...current,
         [userId]: Object.fromEntries(
-          updatedUser.groups.map((group) => [group.groupId, group.role]),
+          updatedUser.organizations.map((organization) => [organization.organizationId, organization.role]),
         ),
       }));
-      setMessage("所属グループを更新しました。");
+      setMessage("所属 organization を更新しました。");
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Unknown error");
     } finally {
@@ -260,7 +262,7 @@ export function AdminRoleEditor({
             <thead className="bg-white/[0.03] text-xs uppercase tracking-[0.18em] text-white/48">
               <tr>
                 <th className="px-6 py-4 font-medium">User</th>
-                <th className="px-6 py-4 font-medium">Groups</th>
+                <th className="px-6 py-4 font-medium">Organizations</th>
                 <th className="px-6 py-4 font-medium">Current Roles</th>
                 <th className="px-6 py-4 font-medium">Edit Roles</th>
                 <th className="px-6 py-4 font-medium">Action</th>
@@ -277,18 +279,18 @@ export function AdminRoleEditor({
               {users.map((user) => {
                 const currentRoles = sortRoles(user.roles);
                 const draft = draftRoles[user.id] ?? currentRoles;
-                const groups = user.groups;
-                const draftGroupRoles = draftMemberships[user.id] ?? {};
+                const organizations = user.organizations;
+                const draftOrganizationRoles = draftMemberships[user.id] ?? {};
                 const dirty = JSON.stringify(draft) !== JSON.stringify(currentRoles);
                 const membershipsDirty =
                   JSON.stringify(
-                    Object.entries(draftGroupRoles)
+                    Object.entries(draftOrganizationRoles)
                       .sort(([left], [right]) => left.localeCompare(right))
-                      .map(([groupId, role]) => `${groupId}:${role}`),
+                      .map(([organizationId, role]) => `${organizationId}:${role}`),
                   ) !==
                   JSON.stringify(
-                    groups
-                      .map((group) => `${group.groupId}:${group.role}`)
+                    organizations
+                      .map((organization) => `${organization.organizationId}:${organization.role}`)
                       .sort((left, right) => left.localeCompare(right)),
                   );
                 const targetIsPrivileged = touchesPrivilegedRole(currentRoles);
@@ -318,28 +320,28 @@ export function AdminRoleEditor({
                     <td className="px-6 py-5">
                       <div className="space-y-3">
                         <div className="flex flex-wrap gap-2">
-                          {groups.length > 0 ? (
-                            groups.map((group) => (
+                          {organizations.length > 0 ? (
+                            organizations.map((organization) => (
                               <span
-                                key={group.groupId}
+                                key={organization.organizationId}
                                 className="rounded-full border border-white/12 bg-white/6 px-3 py-1 text-xs text-white/78"
                               >
-                                {group.groupName} · {formatRole(group.role)}
+                                {organization.organizationName} · {formatRole(organization.role)}
                               </span>
                             ))
                           ) : (
-                            <span className="text-white/42">No groups</span>
+                            <span className="text-white/42">No organizations</span>
                           )}
                         </div>
                         <div className="space-y-2 rounded-2xl border border-white/8 bg-white/[0.02] p-3">
-                          {availableGroups.length > 0 ? (
-                            availableGroups.map((group) => {
-                              const checked = group.id in draftGroupRoles;
-                              const selectedRole = draftGroupRoles[group.id] ?? "viewer";
+                          {availableOrganizations.length > 0 ? (
+                            availableOrganizations.map((organization) => {
+                              const checked = organization.id in draftOrganizationRoles;
+                              const selectedRole = draftOrganizationRoles[organization.id] ?? "viewer";
 
                               return (
                                 <div
-                                  key={group.id}
+                                  key={organization.id}
                                   className="flex flex-col gap-2 rounded-2xl border border-white/6 bg-white/[0.02] px-3 py-3"
                                 >
                                   <label className="flex items-center gap-3 text-sm text-white/84">
@@ -347,21 +349,21 @@ export function AdminRoleEditor({
                                       type="checkbox"
                                       checked={checked}
                                       onChange={(event) =>
-                                        toggleGroupMembership(
+                                        toggleOrganizationMembership(
                                           user.id,
-                                          group.id,
+                                          organization.id,
                                           event.currentTarget.checked,
                                         )
                                       }
                                       className="h-4 w-4 rounded border-white/20 bg-transparent"
                                     />
-                                    <span>{group.name}</span>
+                                    <span>{organization.name}</span>
                                   </label>
                                   <select
                                     value={selectedRole}
                                     disabled={!checked}
                                     onChange={(event) =>
-                                      setGroupRole(user.id, group.id, event.currentTarget.value)
+                                      setOrganizationRole(user.id, organization.id, event.currentTarget.value)
                                     }
                                     className="rounded-xl border border-white/12 bg-white/6 px-3 py-2 text-sm text-white outline-none disabled:cursor-not-allowed disabled:opacity-40"
                                   >
@@ -376,7 +378,7 @@ export function AdminRoleEditor({
                               );
                             })
                           ) : (
-                            <p className="text-sm text-white/44">No groups available.</p>
+                            <p className="text-sm text-white/44">No organizations available.</p>
                           )}
                         </div>
                         <button
@@ -385,7 +387,7 @@ export function AdminRoleEditor({
                           onClick={() => saveMemberships(user.id)}
                           className="inline-flex items-center justify-center rounded-xl border border-sky-400/20 bg-sky-500/10 px-4 py-2 text-sm font-medium text-sky-50 transition hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.02] disabled:text-white/38"
                         >
-                          {savingMembershipUserId === user.id ? "Saving groups..." : "Save Groups"}
+                          {savingMembershipUserId === user.id ? "Saving organizations..." : "Save Organizations"}
                         </button>
                       </div>
                     </td>

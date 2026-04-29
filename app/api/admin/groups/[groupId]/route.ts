@@ -1,6 +1,6 @@
 import { getAppSession } from "@/server/auth/session";
 import { sortRoles } from "@/features/admin/roles";
-import { deleteGroup } from "@/server/repositories/user-repository";
+import { deleteOrganization } from "@/server/repositories/user-repository";
 
 type RouteContext = {
   params: Promise<{
@@ -26,11 +26,11 @@ export async function DELETE(_request: Request, context: RouteContext) {
   }
 
   const actorRoles = sortRoles(session!.roles ?? []);
-  const { groupId } = await context.params;
+  const { groupId: organizationId } = await context.params;
 
   try {
-    await deleteGroup({
-      groupId,
+    await deleteOrganization({
+      organizationId,
       actorUserId,
       actorRoles,
     });
