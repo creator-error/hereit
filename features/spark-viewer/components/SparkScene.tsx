@@ -38,8 +38,10 @@ import { useViewerUiStore } from "@/features/spark-viewer/stores/viewerUiStore";
 export type { ViewerLoadingState } from "@/features/spark-viewer/sceneTypes";
 
 export function SparkScene({
+  collisionAssetUrl = COLLISION_ASSET_URL,
   onLoadingStateChange,
   soundEnabled = false,
+  splatAssetUrl = SPARK_ASSET_URL,
   showCollisionMesh = false,
 }: SparkSceneProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -496,7 +498,7 @@ export function SparkScene({
         });
 
         const mesh = new SplatMesh({
-          url: SPARK_ASSET_URL,
+          url: splatAssetUrl ?? SPARK_ASSET_URL,
           onProgress: (event) => {
             const total = event.total && event.total > 0 ? event.total : event.loaded || 1;
             const ratio = total > 0 ? event.loaded / total : 0;
@@ -567,7 +569,9 @@ export function SparkScene({
           detail: "部屋メッシュを読み込んでいます",
         });
 
-        const collisionGltf = await new GLTFLoader().loadAsync(COLLISION_ASSET_URL);
+        const collisionGltf = await new GLTFLoader().loadAsync(
+          collisionAssetUrl ?? COLLISION_ASSET_URL,
+        );
 
         if (disposed) {
           disposeObject3D(collisionGltf.scene);

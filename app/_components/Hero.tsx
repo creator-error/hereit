@@ -1,7 +1,11 @@
 import { ArrowRight, Check } from "lucide-react";
 import { ImageWithFallback } from "./ImageWithFallback";
 
-export function Hero() {
+type HeroProps = {
+  isSignedIn: boolean;
+};
+
+export function Hero({ isSignedIn }: HeroProps) {
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       <div className="absolute inset-0 z-0">
@@ -46,6 +50,12 @@ export function Hero() {
               className="px-8 py-4 border-2 border-[#f59e0b] text-[#f59e0b] rounded-lg hover:bg-[#f59e0b]/10 transition-all duration-300 text-center"
             >
               空間イメージを見る
+            </a>
+            <a
+              href="/login"
+              className="px-8 py-4 border border-white/20 text-white rounded-lg hover:bg-white/8 transition-all duration-300 text-center"
+            >
+              {isSignedIn ? "ログイン状態を見る" : "Googleでログイン"}
             </a>
           </div>
 

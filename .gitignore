@@ -78,6 +78,7 @@ web_modules/
 .next
 out
 .open-next
+.data
 
 # Nuxt.js build / generate output
 .nuxt

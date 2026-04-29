@@ -42,8 +42,10 @@ export type MovementControlKey = keyof Pick<
 >;
 
 export type SparkSceneProps = {
+  collisionAssetUrl?: string | null;
   onLoadingStateChange?: (state: ViewerLoadingState) => void;
   soundEnabled?: boolean;
+  splatAssetUrl?: string | null;
   showCollisionMesh?: boolean;
 };
 
