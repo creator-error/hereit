@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { SceneShareControls } from "../_components/SceneShareControls";
+import { SceneAudioEditor } from "./SceneAudioEditor";
 import { SceneViewerClient } from "./SceneViewerClient";
 import { getAppSession } from "@/server/auth/session";
 import { sortRoles } from "@/features/admin/roles";
 import {
   getSceneAccessHintByUuid,
+  listAudioPlacementsForSceneUuidActor,
   getVisibleSceneByUuidForActor,
 } from "@/server/repositories/user-repository";
 
@@ -66,6 +68,9 @@ export default async function SceneDetailPage({ params }: PageProps) {
     );
   }
 
+  const audioPlacements = (await listAudioPlacementsForSceneUuidActor(sceneUuid, actor)) ?? [];
+  const canEditAudio = sessionRolesCanEdit(session?.roles ?? []);
+
   return (
     <main className="min-h-screen bg-[#08111f] px-6 py-12 text-white">
       <div className="mx-auto max-w-6xl space-y-6">
@@ -95,6 +100,13 @@ export default async function SceneDetailPage({ params }: PageProps) {
 
         <section className="grid gap-6 lg:grid-cols-[1.2fr,0.8fr]">
           <SceneViewerClient
+            audioSources={audioPlacements.map((placement) => ({
+              gain: placement.gain,
+              loop: placement.loop,
+              name: placement.name ?? placement.originalFilename ?? "audio",
+              position: placement.position,
+              url: placement.url,
+            }))}
             splatAssetUrl={scene.roomPlyUrl}
             collisionAssetUrl={scene.roomGlbUrl}
           />
@@ -118,6 +130,10 @@ export default async function SceneDetailPage({ params }: PageProps) {
                   {scene.roomGlbUrl ?? "No GLB URL"}
                 </dd>
               </div>
+              <div>
+                <dt className="text-white/44">Audio Placements</dt>
+                <dd className="mt-1 text-white/78">{audioPlacements.length}</dd>
+              </div>
             </dl>
             <SceneShareControls sceneUuid={scene.uuid} shared={scene.shared} />
             <div className="mt-3 flex flex-wrap gap-3">
@@ -136,7 +152,18 @@ export default async function SceneDetailPage({ params }: PageProps) {
             </div>
           </aside>
         </section>
+
+        <SceneAudioEditor
+          canEdit={canEditAudio}
+          initialPlacements={audioPlacements}
+          sceneUuid={scene.uuid}
+        />
       </div>
     </main>
   );
+}
+
+function sessionRolesCanEdit(roles: string[] | undefined) {
+  const normalized = sortRoles(roles ?? []);
+  return normalized.includes("admin") || normalized.includes("editor");
 }

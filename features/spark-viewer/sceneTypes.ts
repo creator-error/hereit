@@ -36,12 +36,28 @@ export type ViewerLoadingState = {
   detail: string;
 };
 
+export type SparkAudioSource = {
+  gain: number;
+  loop: boolean;
+  name: string;
+  position: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  refDistance?: number;
+  maxDistance?: number;
+  rolloffFactor?: number;
+  url: string;
+};
+
 export type MovementControlKey = keyof Pick<
   InputState,
   "forward" | "back" | "left" | "right" | "up" | "down"
 >;
 
 export type SparkSceneProps = {
+  audioSources?: SparkAudioSource[];
   collisionAssetUrl?: string | null;
   onLoadingStateChange?: (state: ViewerLoadingState) => void;
   soundEnabled?: boolean;

@@ -123,6 +123,8 @@ R2 upload API は未実装のため、現時点では R2 binding 自体は必須
 
 - `https://<production-host>/auth/callback/google`
 
+本番投入前の secret / redirect URI / binding 確認は [cloudflare-production-checklist.md](./cloudflare-production-checklist.md) を参照。
+
 ## D1 Setup
 
 この repo の schema は `server/db/migrations/0001_users.sql` にある。

@@ -61,6 +61,7 @@ Google OAuth の redirect URI は次を登録します。
 開発中の DB 接続確認は `GET /api/health/db` で行えます。D1 binding が見つかれば `cloudflare-d1`、それ以外は `local-sqlite` を返し、実際に probe レコードを書き込んで読み戻します。
 
 環境別セットアップは [docs/environment-setup.md](docs/environment-setup.md) を参照してください。
+Cloudflare 本番用の OAuth / D1 / R2 確認は [docs/cloudflare-production-checklist.md](docs/cloudflare-production-checklist.md) にまとめています。
 
 ## Database Migrations
 

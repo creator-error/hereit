@@ -25,6 +25,7 @@
 1. `shared = true` の Scene を 1 件作る
 2. 未ログイン状態で `/scenes/:sceneUuid` にアクセスする
 3. Scene 詳細が表示されることを確認する
+4. `Copy Shared URL` が利用できることを確認する
 4. `shared = false` の Scene に未ログインでアクセスする
 5. `/login?callbackUrl=...` に誘導されることを確認する
 
@@ -51,3 +52,15 @@
 3. `/scenes/:sceneUuid` が 404 になることを確認する
 4. members または scenes がある group の削除が拒否されることを確認する
 5. 空の group のみ削除できることを確認する
+
+## Audio Placement Flow
+
+1. `admin` または対象 group の `editor` でログインする
+2. 対象 Scene UUID を控える
+3. `PUT /api/scenes/:sceneUuid/audio-placements` に対して、audio URL と position を含む payload を送る
+4. `GET /api/scenes/:sceneUuid/audio-placements` で保存内容が返ることを確認する
+5. `/api/scenes/:sceneUuid` に `audioPlacements` が含まれることを確認する
+6. `/scenes/:sceneUuid` を開き、Audio Placements 件数が反映されることを確認する
+7. shared Scene なら未ログインでも `/api/scenes/:sceneUuid/audio-placements` と `/scenes/:sceneUuid` で閲覧できることを確認する
+8. private Scene では未ログイン閲覧が拒否されることを確認する
+9. 非所属 viewer または一般ユーザーが `PUT /api/scenes/:sceneUuid/audio-placements` を呼ぶと 403 または 401 になることを確認する

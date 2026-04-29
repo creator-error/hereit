@@ -42,6 +42,29 @@ export type AppSceneSummary = {
   roomGlbUrl: string | null;
 };
 
+export type AppAudioPlacement = {
+  id: string;
+  sceneId: string;
+  audioFileId: string;
+  name: string | null;
+  url: string;
+  originalFilename: string | null;
+  mimeType: string | null;
+  byteSize: number | null;
+  position: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  rotation: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  gain: number;
+  loop: boolean;
+};
+
 export type AppGroupSummary = {
   id: string;
   name: string;
@@ -256,6 +279,25 @@ type GroupMembershipRow = {
   group_id: string;
   group_name: string;
   role: string | null;
+};
+
+type AudioPlacementRow = {
+  id: string;
+  scene_id: string;
+  audio_file_id: string;
+  name: string | null;
+  url: string;
+  original_filename: string | null;
+  mime_type: string | null;
+  byte_size: number | null;
+  position_x: number;
+  position_y: number;
+  position_z: number;
+  rotation_x: number;
+  rotation_y: number;
+  rotation_z: number;
+  gain: number;
+  loop_enabled: number;
 };
 
 type GroupSummaryRow = {
@@ -831,6 +873,273 @@ export async function getSceneAccessHintByUuid(sceneUuid: string): Promise<Scene
     exists: true,
     shared: row.shared === 1,
   };
+}
+
+function mapAudioPlacementRow(row: AudioPlacementRow): AppAudioPlacement {
+  return {
+    id: row.id,
+    sceneId: row.scene_id,
+    audioFileId: row.audio_file_id,
+    name: row.name,
+    url: row.url,
+    originalFilename: row.original_filename,
+    mimeType: row.mime_type,
+    byteSize: row.byte_size,
+    position: {
+      x: row.position_x,
+      y: row.position_y,
+      z: row.position_z,
+    },
+    rotation: {
+      x: row.rotation_x,
+      y: row.rotation_y,
+      z: row.rotation_z,
+    },
+    gain: row.gain,
+    loop: row.loop_enabled === 1,
+  };
+}
+
+export async function listAudioPlacementsForSceneUuidActor(
+  sceneUuid: string,
+  actor: SceneAccessActor,
+): Promise<AppAudioPlacement[] | null> {
+  const scene = await getVisibleSceneByUuidForActor(sceneUuid, actor);
+
+  if (!scene) {
+    return null;
+  }
+
+  const db = await ensureAuthSchema();
+  const rows = await db.all<AudioPlacementRow>(
+    `
+      SELECT
+        ap.id,
+        ap.scene_id,
+        ap.audio_file_id,
+        ap.name,
+        af.url,
+        af.original_filename,
+        af.mime_type,
+        af.byte_size,
+        ap.position_x,
+        ap.position_y,
+        ap.position_z,
+        ap.rotation_x,
+        ap.rotation_y,
+        ap.rotation_z,
+        ap.gain,
+        ap.loop_enabled
+      FROM audio_placements ap
+      INNER JOIN audio_files af
+        ON af.id = ap.audio_file_id
+      WHERE ap.scene_id = ?
+      ORDER BY COALESCE(ap.name, af.original_filename, af.url) ASC, ap.id ASC
+    `,
+    [scene.id],
+  );
+
+  return rows.map(mapAudioPlacementRow);
+}
+
+export async function replaceAudioPlacementsForSceneUuid(input: {
+  sceneUuid: string;
+  actorUserId: string;
+  actorRoles: string[];
+  placements: Array<{
+    name: string | null;
+    url: string;
+    originalFilename: string | null;
+    mimeType: string | null;
+    byteSize: number | null;
+    position: {
+      x: number;
+      y: number;
+      z: number;
+    };
+    rotation: {
+      x: number;
+      y: number;
+      z: number;
+    };
+    gain: number;
+    loop: boolean;
+  }>;
+}): Promise<AppAudioPlacement[]> {
+  const db = await ensureAuthSchema();
+  const scene = await db.first<{ id: string; group_id: string }>(
+    `
+      SELECT id, group_id
+      FROM scenes
+      WHERE uuid = ?
+      LIMIT 1
+    `,
+    [input.sceneUuid],
+  );
+
+  if (!scene) {
+    throw new Error("Scene not found");
+  }
+
+  const allowed = await canManageGroup({
+    userId: input.actorUserId,
+    roles: input.actorRoles,
+    groupId: scene.group_id,
+  });
+
+  if (!allowed) {
+    throw new Error("Forbidden");
+  }
+
+  const now = new Date().toISOString();
+  const normalizedPlacements = input.placements
+    .map((placement) => ({
+      name: placement.name?.trim() || null,
+      url: placement.url.trim(),
+      originalFilename: placement.originalFilename?.trim() || null,
+      mimeType: placement.mimeType?.trim() || null,
+      byteSize:
+        typeof placement.byteSize === "number" && Number.isFinite(placement.byteSize)
+          ? Math.max(0, Math.round(placement.byteSize))
+          : null,
+      position: {
+        x: Number(placement.position.x),
+        y: Number(placement.position.y),
+        z: Number(placement.position.z),
+      },
+      rotation: {
+        x: Number(placement.rotation.x),
+        y: Number(placement.rotation.y),
+        z: Number(placement.rotation.z),
+      },
+      gain: Number(placement.gain),
+      loop: placement.loop,
+    }))
+    .filter((placement) => placement.url.length > 0)
+    .filter(
+      (placement) =>
+        Number.isFinite(placement.position.x) &&
+        Number.isFinite(placement.position.y) &&
+        Number.isFinite(placement.position.z) &&
+        Number.isFinite(placement.rotation.x) &&
+        Number.isFinite(placement.rotation.y) &&
+        Number.isFinite(placement.rotation.z) &&
+        Number.isFinite(placement.gain),
+    );
+
+  await db.run("DELETE FROM audio_placements WHERE scene_id = ?", [scene.id]);
+  await db.run("DELETE FROM audio_files WHERE scene_id = ?", [scene.id]);
+
+  const fileIdsByKey = new Map<string, string>();
+
+  for (const placement of normalizedPlacements) {
+    const fileKey = [
+      placement.url,
+      placement.originalFilename ?? "",
+      placement.mimeType ?? "",
+      placement.byteSize ?? "",
+    ].join("::");
+
+    let audioFileId = fileIdsByKey.get(fileKey);
+
+    if (!audioFileId) {
+      audioFileId = crypto.randomUUID();
+      fileIdsByKey.set(fileKey, audioFileId);
+      await db.run(
+        `
+          INSERT INTO audio_files (
+            id,
+            scene_id,
+            url,
+            original_filename,
+            mime_type,
+            byte_size,
+            created_by_user_id,
+            created_at,
+            updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          audioFileId,
+          scene.id,
+          placement.url,
+          placement.originalFilename,
+          placement.mimeType,
+          placement.byteSize,
+          input.actorUserId,
+          now,
+          now,
+        ],
+      );
+    }
+
+    await db.run(
+      `
+        INSERT INTO audio_placements (
+          id,
+          scene_id,
+          audio_file_id,
+          name,
+          position_x,
+          position_y,
+          position_z,
+          rotation_x,
+          rotation_y,
+          rotation_z,
+          gain,
+          loop_enabled,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        crypto.randomUUID(),
+        scene.id,
+        audioFileId,
+        placement.name,
+        placement.position.x,
+        placement.position.y,
+        placement.position.z,
+        placement.rotation.x,
+        placement.rotation.y,
+        placement.rotation.z,
+        placement.gain,
+        placement.loop ? 1 : 0,
+        now,
+        now,
+      ],
+    );
+  }
+
+  const rows = await db.all<AudioPlacementRow>(
+    `
+      SELECT
+        ap.id,
+        ap.scene_id,
+        ap.audio_file_id,
+        ap.name,
+        af.url,
+        af.original_filename,
+        af.mime_type,
+        af.byte_size,
+        ap.position_x,
+        ap.position_y,
+        ap.position_z,
+        ap.rotation_x,
+        ap.rotation_y,
+        ap.rotation_z,
+        ap.gain,
+        ap.loop_enabled
+      FROM audio_placements ap
+      INNER JOIN audio_files af
+        ON af.id = ap.audio_file_id
+      WHERE ap.scene_id = ?
+      ORDER BY COALESCE(ap.name, af.original_filename, af.url) ASC, ap.id ASC
+    `,
+    [scene.id],
+  );
+
+  return rows.map(mapAudioPlacementRow);
 }
 
 export async function listManageableGroupsForUser(input: {

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import type { ViewerLoadingState } from "@/features/spark-viewer/components/SparkScene";
+import type { SparkAudioSource } from "@/features/spark-viewer/sceneTypes";
 
 const SparkScene = dynamic(
   () =>
@@ -11,11 +12,13 @@ const SparkScene = dynamic(
 );
 
 type SceneViewerClientProps = {
+  audioSources: SparkAudioSource[];
   collisionAssetUrl: string | null;
   splatAssetUrl: string | null;
 };
 
 export function SceneViewerClient({
+  audioSources,
   collisionAssetUrl,
   splatAssetUrl,
 }: SceneViewerClientProps) {
@@ -51,6 +54,7 @@ export function SceneViewerClient({
 
         <div className="h-[560px]">
           <SparkScene
+            audioSources={audioSources}
             collisionAssetUrl={collisionAssetUrl}
             splatAssetUrl={splatAssetUrl}
             showCollisionMesh={showCollisionMesh}

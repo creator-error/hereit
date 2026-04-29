@@ -30,6 +30,7 @@ import type {
   JoystickVector,
   MovementControlKey,
   OrientationState,
+  SparkAudioSource,
   SparkSceneProps,
   ViewerLoadingState,
 } from "@/features/spark-viewer/sceneTypes";
@@ -38,6 +39,7 @@ import { useViewerUiStore } from "@/features/spark-viewer/stores/viewerUiStore";
 export type { ViewerLoadingState } from "@/features/spark-viewer/sceneTypes";
 
 export function SparkScene({
+  audioSources,
   collisionAssetUrl = COLLISION_ASSET_URL,
   onLoadingStateChange,
   soundEnabled = false,
@@ -598,10 +600,24 @@ export function SparkScene({
         }
 
         const audioLoader = new THREE.AudioLoader();
-        const roomCenter = worldBounds.getCenter(new THREE.Vector3());
-        const roomSize = worldBounds.getSize(new THREE.Vector3());
+        const sceneAudioSources: SparkAudioSource[] =
+          audioSources ??
+          POSITIONAL_AUDIO_SOURCES.map((source) => ({
+            gain: source.volume,
+            loop: source.loop,
+            maxDistance: source.maxDistance,
+            name: source.name,
+            position: {
+              x: source.worldOffset.x,
+              y: source.worldOffset.y,
+              z: source.worldOffset.z,
+            },
+            refDistance: source.refDistance,
+            rolloffFactor: source.rolloffFactor,
+            url: source.url,
+          }));
         const audioEntries = await Promise.all(
-          POSITIONAL_AUDIO_SOURCES.map(async (source) => {
+          sceneAudioSources.map(async (source) => {
             const buffer = await audioLoader.loadAsync(source.url);
             return { buffer, source };
           }),
@@ -614,23 +630,15 @@ export function SparkScene({
         for (const { buffer, source } of audioEntries) {
           const holder = new THREE.Object3D();
           holder.name = `audio-source-${source.name}`;
-          holder.position
-            .copy(roomCenter)
-            .add(
-              new THREE.Vector3(
-                source.worldOffset.x * roomSize.x * 0.32,
-                source.worldOffset.y,
-                source.worldOffset.z * roomSize.z * 0.32,
-              ),
-            );
+          holder.position.set(source.position.x, source.position.y, source.position.z);
 
           const audio = new THREE.PositionalAudio(audioListener);
           audio.setBuffer(buffer);
           audio.setLoop(source.loop);
-          audio.setVolume(source.volume);
-          audio.setRefDistance(source.refDistance);
-          audio.setMaxDistance(source.maxDistance);
-          audio.setRolloffFactor(source.rolloffFactor);
+          audio.setVolume(source.gain);
+          audio.setRefDistance(source.refDistance ?? 0.9);
+          audio.setMaxDistance(source.maxDistance ?? 5.8);
+          audio.setRolloffFactor(source.rolloffFactor ?? 1.7);
           holder.add(audio);
           holder.add(createAudioMarker(source.name));
           scene.add(holder);
@@ -747,7 +755,7 @@ export function SparkScene({
         container.removeChild(renderer.domElement);
       }
     };
-  }, []);
+  }, [audioSources, collisionAssetUrl, onLoadingStateChange, resetViewerUi, setCompass, setJoystickOffset, setStatus, showCollisionMesh, soundEnabled, splatAssetUrl]);
 
   return (
     <div

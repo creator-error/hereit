@@ -88,3 +88,28 @@
   - `.data/hereit.sqlite`
   - `scripts/apply-local-migrations.mjs`
   - `scripts/reset-local-db.mjs`
+
+## 9. audio 配置を保存したのに Scene 詳細で反映されない
+
+- 確認点
+  - `GET /api/scenes/:sceneUuid/audio-placements` に保存結果が出るか
+  - `GET /api/scenes/:sceneUuid` に `audioPlacements` が含まれるか
+  - audio URL がブラウザから取得可能か
+- まず見る場所
+  - `app/api/scenes/[sceneUuid]/audio-placements/route.ts`
+  - `app/api/scenes/[sceneUuid]/route.ts`
+  - `server/repositories/user-repository.ts`
+  - browser network tab
+
+## 10. audio 配置保存が 403 になる
+
+- 期待動作
+  - `admin` または所属 group の `editor` だけが保存できる
+- 確認点
+  - session roles
+  - `group_memberships` の対象 group role
+  - 対象 Scene UUID が正しい group を指しているか
+- まず見る場所
+  - `/login` の session payload
+  - `/admin/users`
+  - `canManageGroup` in `server/repositories/user-repository.ts`
