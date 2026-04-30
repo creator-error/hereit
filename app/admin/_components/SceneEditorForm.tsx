@@ -19,16 +19,12 @@ export function SceneEditorForm({ mode, organizations, initialValue }: SceneEdit
   const action = mode === "create" ? createSceneAction : updateSceneAction;
 
   return (
-    <form
-      action={action}
-      encType="multipart/form-data"
-      className="space-y-6 rounded-[32px] border border-white/10 bg-[#0c1423] p-8 shadow-2xl shadow-black/20"
-    >
+    <form action={action} className="space-y-6 rounded-[32px] border border-white/10 bg-[#0c1423] p-8 shadow-2xl shadow-black/20">
       {initialValue ? <input type="hidden" name="sceneId" value={initialValue.id} /> : null}
 
       <div className="grid gap-5 lg:grid-cols-2">
         <div>
-          <label className="text-xs uppercase tracking-[0.18em] text-white/44">Organization</label>
+          <label className="text-xs uppercase tracking-[0.18em] text-white/44">組織</label>
           <select
             name="organizationId"
             required
@@ -44,76 +40,51 @@ export function SceneEditorForm({ mode, organizations, initialValue }: SceneEdit
         </div>
 
         <div>
-          <label className="text-xs uppercase tracking-[0.18em] text-white/44">Scene Name</label>
+          <label className="text-xs uppercase tracking-[0.18em] text-white/44">シーン名</label>
           <input
             type="text"
             name="name"
             required
             defaultValue={initialValue?.name ?? ""}
             className="mt-2 w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
-            placeholder="Main Lobby Arrival"
+            placeholder="メインロビー入口"
           />
         </div>
       </div>
 
       <div>
-        <label className="text-xs uppercase tracking-[0.18em] text-white/44">Description</label>
+        <label className="text-xs uppercase tracking-[0.18em] text-white/44">説明</label>
         <textarea
           name="description"
           rows={4}
           defaultValue={initialValue?.description ?? ""}
           className="mt-2 w-full rounded-3xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
-          placeholder="What this scene is for and who should review it"
+          placeholder="このシーンの用途や確認してほしい相手"
         />
       </div>
 
-      {mode === "create" ? (
-        <div className="grid gap-5 lg:grid-cols-2">
-          <div>
-            <label className="text-xs uppercase tracking-[0.18em] text-white/44">PLY File</label>
-            <input
-              type="file"
-              name="roomPlyFile"
-              required
-              accept=".ply,.spz"
-              className="mt-2 block w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none file:mr-4 file:rounded-xl file:border-0 file:bg-[#f59e0b] file:px-3 file:py-2 file:text-sm file:font-medium file:text-[#111827]"
-            />
-          </div>
-          <div>
-            <label className="text-xs uppercase tracking-[0.18em] text-white/44">GLB File</label>
-            <input
-              type="file"
-              name="roomGlbFile"
-              required
-              accept=".glb"
-              className="mt-2 block w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none file:mr-4 file:rounded-xl file:border-0 file:bg-[#f59e0b] file:px-3 file:py-2 file:text-sm file:font-medium file:text-[#111827]"
-            />
-          </div>
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div>
+          <label className="text-xs uppercase tracking-[0.18em] text-white/44">PLY URL</label>
+          <input
+            type="url"
+            name="roomPlyUrl"
+            defaultValue={initialValue?.roomPlyUrl ?? ""}
+            className="mt-2 w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
+            placeholder="https://r2.example.com/3dgs/organization-id/scene-id/room.ply"
+          />
         </div>
-      ) : (
-        <div className="grid gap-5 lg:grid-cols-2">
-          <div>
-            <label className="text-xs uppercase tracking-[0.18em] text-white/44">PLY URL</label>
-            <input
-              type="url"
-              name="roomPlyUrl"
-              defaultValue={initialValue?.roomPlyUrl ?? ""}
-              className="mt-2 w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
-              placeholder="https://r2.example.com/scenes/room.ply"
-            />
-          </div>
-          <div>
-            <label className="text-xs uppercase tracking-[0.18em] text-white/44">GLB URL</label>
-            <input
-              type="url"
-              name="roomGlbUrl"
-              defaultValue={initialValue?.roomGlbUrl ?? ""}
-              className="mt-2 w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
-              placeholder="https://r2.example.com/scenes/room.glb"
-            />
-          </div>
+        <div>
+          <label className="text-xs uppercase tracking-[0.18em] text-white/44">GLB URL</label>
+          <input
+            type="url"
+            name="roomGlbUrl"
+            defaultValue={initialValue?.roomGlbUrl ?? ""}
+            className="mt-2 w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
+            placeholder="https://r2.example.com/3dgs/organization-id/scene-id/collision.glb"
+          />
         </div>
-      )}
+      </div>
 
       <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-white/84">
         <input
@@ -130,13 +101,13 @@ export function SceneEditorForm({ mode, organizations, initialValue }: SceneEdit
           type="submit"
           className="rounded-2xl bg-[#f59e0b] px-5 py-3 text-sm font-medium text-[#111827] transition hover:bg-[#fbbf24]"
         >
-          {mode === "create" ? "Create Scene" : "Save Scene"}
+          {mode === "create" ? "シーンを作成" : "保存"}
         </button>
         <a
           href="/admin"
           className="rounded-2xl border border-white/12 bg-white/6 px-5 py-3 text-sm text-white transition hover:bg-white/10"
         >
-          Back to Admin
+          管理画面に戻る
         </a>
       </div>
     </form>

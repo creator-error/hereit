@@ -50,7 +50,7 @@ export default async function EditScenePage({ params }: PageProps) {
       <main className="px-6 py-8">
         <div className="mx-auto max-w-5xl space-y-6">
           <section className="rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.16),_transparent_36%),linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-8 shadow-2xl shadow-black/30">
-            <p className="text-sm uppercase tracking-[0.28em] text-[#f59e0b]">Edit Scene</p>
+            <p className="text-sm uppercase tracking-[0.28em] text-[#f59e0b]">シーン編集</p>
             <h1 className="mt-3 text-4xl font-semibold">{scene.name}</h1>
           </section>
           <SceneEditorForm mode="edit" organizations={organizations} initialValue={scene} />

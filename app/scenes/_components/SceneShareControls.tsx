@@ -1,15 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useToast } from "@/app/_components/ToastProvider";
 
 type SceneShareControlsProps = {
   sceneId: string;
   shared: boolean;
   compact?: boolean;
 };
-
-type CopyState = "idle" | "copied" | "error";
 
 function getSceneUrl(sceneId: string) {
   return `/scenes/${sceneId}`;
@@ -20,8 +18,8 @@ export function SceneShareControls({
   shared,
   compact = false,
 }: SceneShareControlsProps) {
-  const [copyState, setCopyState] = useState<CopyState>("idle");
   const scenePath = getSceneUrl(sceneId);
+  const { showToast } = useToast();
 
   async function handleCopy() {
     if (!shared) {
@@ -34,9 +32,9 @@ export function SceneShareControls({
           ? scenePath
           : new URL(scenePath, window.location.origin).toString();
       await navigator.clipboard.writeText(url);
-      setCopyState("copied");
+      showToast("共有URLをコピーしました。", "success");
     } catch {
-      setCopyState("error");
+      showToast("共有URLのコピーに失敗しました。", "error");
     }
   }
 
@@ -50,7 +48,7 @@ export function SceneShareControls({
             : "bg-[#f59e0b] font-medium text-[#111827] hover:bg-[#fbbf24]"
         }`}
       >
-        Open Scene
+        シーンを開く
       </Link>
       <button
         type="button"
@@ -62,14 +60,8 @@ export function SceneShareControls({
             : "cursor-not-allowed border border-white/10 bg-white/[0.03] text-white/36"
         }`}
       >
-        {shared ? "Copy Shared URL" : "Private Scene"}
+        {shared ? "共有URLをコピー" : "非公開シーン"}
       </button>
-      {copyState === "copied" ? (
-        <p className="self-center text-xs text-emerald-200">Copied</p>
-      ) : null}
-      {copyState === "error" ? (
-        <p className="self-center text-xs text-rose-200">Copy failed</p>
-      ) : null}
     </div>
   );
 }

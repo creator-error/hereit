@@ -7,11 +7,7 @@ import {
   listUsersWithMemberships,
 } from "@/server/repositories/user-repository";
 import { getAppSession } from "@/server/auth/session";
-import {
-  hasUserAdminAccess,
-  isBootstrapCandidate,
-  sortRoles,
-} from "@/features/admin/roles";
+import { hasUserAdminAccess, isBootstrapCandidate, sortRoles } from "@/features/admin/roles";
 
 export default async function AdminUsersPage() {
   const session = await getAppSession();
@@ -31,7 +27,7 @@ export default async function AdminUsersPage() {
       <main className="min-h-screen bg-[#0b1220] px-6 py-16 text-white">
         <div className="mx-auto max-w-3xl rounded-3xl border border-rose-400/20 bg-rose-500/10 p-8">
           <p className="text-sm uppercase tracking-[0.24em] text-rose-200">403</p>
-          <h1 className="mt-3 text-3xl font-semibold">Admin access denied</h1>
+          <h1 className="mt-3 text-3xl font-semibold">管理画面にアクセスできません</h1>
           <p className="mt-4 text-sm leading-7 text-white/78">
             {bootstrapMode
               ? "`/admin/users` bootstrap は role 未設定のログインユーザー本人に限定されます。"
@@ -54,9 +50,9 @@ export default async function AdminUsersPage() {
         <div className="mx-auto max-w-7xl space-y-6">
           <section className="rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.14),_transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-8 shadow-2xl shadow-black/30">
             <p className="text-sm uppercase tracking-[0.28em] text-sky-300">Users</p>
-            <h1 className="mt-3 text-4xl font-semibold">User directory and role controls</h1>
+            <h1 className="mt-3 text-4xl font-semibold">利用者一覧と権限管理</h1>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-white/72">
-              名前、メールアドレス、所属 organization、role を一覧し、必要ならここから権限を更新します。
+              名前、メールアドレス、所属組織、権限を一覧し、必要ならここから更新します。
             </p>
           </section>
 

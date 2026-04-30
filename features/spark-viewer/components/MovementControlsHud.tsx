@@ -11,6 +11,7 @@ type MovementControlsHudProps = {
   onJoystickPointerLeave: (event: React.PointerEvent<HTMLDivElement>) => void;
   onJoystickPointerMove: (event: React.PointerEvent<HTMLDivElement>) => void;
   onJoystickPointerUp: (event: React.PointerEvent<HTMLDivElement>) => void;
+  reduced?: boolean;
   setMovementControl: (key: MovementControlKey, active: boolean) => void;
 };
 
@@ -30,8 +31,37 @@ export function MovementControlsHud({
   onJoystickPointerLeave,
   onJoystickPointerMove,
   onJoystickPointerUp,
+  reduced = false,
   setMovementControl,
 }: MovementControlsHudProps) {
+  if (reduced) {
+    return (
+      <div className="pointer-events-none absolute left-[max(20px,env(safe-area-inset-left))] bottom-[max(20px,calc(env(safe-area-inset-bottom)+20px))] z-[3] flex flex-col gap-3">
+        {(["up", "down"] as const).map((key) => {
+          const label = key === "up" ? "U" : "D";
+          return (
+            <button
+              key={key}
+              type="button"
+              className="pointer-events-auto grid h-[56px] w-[56px] place-items-center rounded-[18px] border border-[rgba(212,175,55,0.3)] bg-[linear-gradient(180deg,rgba(26,31,40,0.92),rgba(15,19,28,0.9))] text-[1.15rem] font-semibold text-white shadow-[0_18px_32px_rgba(0,0,0,0.34)] backdrop-blur-[12px] touch-none select-none active:scale-[0.97]"
+              aria-label={`${label}へ移動`}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                event.currentTarget.setPointerCapture(event.pointerId);
+                setMovementControl(key, true);
+              }}
+              onPointerUp={() => endMovementControl(key)}
+              onPointerCancel={() => endMovementControl(key)}
+              onPointerLeave={() => endMovementControl(key)}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div className="pointer-events-none absolute right-[max(16px,env(safe-area-inset-right))] bottom-[max(16px,calc(env(safe-area-inset-bottom)+16px))] left-[max(16px,env(safe-area-inset-left))] z-[2] flex items-end justify-between max-[960px]:bottom-[max(104px,calc(env(safe-area-inset-bottom)+18px))]">
       <div

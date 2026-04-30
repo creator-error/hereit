@@ -8,7 +8,7 @@ import {
   CAMERA_COLLISION_RADIUS,
 } from "@/features/spark-viewer/sceneConstants";
 import type { CompassState } from "@/features/spark-viewer/uiTypes";
-import type { StartingView } from "@/features/spark-viewer/sceneTypes";
+import type { SceneInitialView, StartingView } from "@/features/spark-viewer/sceneTypes";
 
 export function disposeObject3D(root: THREE.Object3D) {
   root.traverse((child) => {
@@ -77,17 +77,126 @@ export function collidesWithRoom(
   });
 }
 
-export function createAudioMarker(name: string) {
+export function createPlacementMarker(kind: "audio" | "tag", selected = false) {
+  if (kind === "tag") {
+    const group = new THREE.Group();
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(selected ? 0.11 : 0.09, 0.018, 16, 32),
+      new THREE.MeshBasicMaterial({
+        color: selected ? "#f8e39a" : "#d4af37",
+        transparent: true,
+        opacity: 0.98,
+      }),
+    );
+    ring.rotation.x = Math.PI / 2;
+    const core = new THREE.Mesh(
+      new THREE.SphereGeometry(selected ? 0.038 : 0.03, 16, 12),
+      new THREE.MeshBasicMaterial({
+        color: selected ? "#fff8db" : "#f4d574",
+        transparent: true,
+        opacity: 0.95,
+      }),
+    );
+    group.add(ring);
+    group.add(core);
+    group.name = "tag-marker";
+    return group;
+  }
+
   const marker = new THREE.Mesh(
-    new THREE.SphereGeometry(0.08, 16, 12),
+    new THREE.SphereGeometry(selected ? 0.12 : 0.08, 16, 12),
     new THREE.MeshBasicMaterial({
-      color: name === "stream" ? "#38bdf8" : "#facc15",
+      color: selected ? "#fb7185" : kind === "audio" ? "#38bdf8" : "#facc15",
       transparent: true,
-      opacity: 0.82,
+      opacity: selected ? 0.95 : 0.82,
     }),
   );
-  marker.name = `audio-marker-${name}`;
+  marker.name = `${kind}-marker`;
   return marker;
+}
+
+export function renderTopDownMapFromCollisionMeshes(
+  meshes: THREE.Mesh[],
+  bounds: THREE.Box3,
+  size = 256,
+) {
+  if (typeof document === "undefined" || meshes.length === 0) {
+    return null;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    return null;
+  }
+
+  context.clearRect(0, 0, size, size);
+  context.fillStyle = "#08111e";
+  context.fillRect(0, 0, size, size);
+
+  const padding = 12;
+  const spanX = Math.max(bounds.max.x - bounds.min.x, 0.001);
+  const spanZ = Math.max(bounds.max.z - bounds.min.z, 0.001);
+  const scale = Math.min((size - padding * 2) / spanX, (size - padding * 2) / spanZ);
+  const offsetX = (size - spanX * scale) * 0.5;
+  const offsetY = (size - spanZ * scale) * 0.5;
+
+  const project = (x: number, z: number) => ({
+    x: offsetX + (x - bounds.min.x) * scale,
+    y: size - (offsetY + (z - bounds.min.z) * scale),
+  });
+
+  context.strokeStyle = "rgba(125, 211, 252, 0.55)";
+  context.fillStyle = "rgba(56, 189, 248, 0.18)";
+  context.lineWidth = 0.8;
+
+  const triangleA = new THREE.Vector3();
+  const triangleB = new THREE.Vector3();
+  const triangleC = new THREE.Vector3();
+
+  for (const mesh of meshes) {
+    const geometry = mesh.geometry;
+    const positionAttribute = geometry.getAttribute("position");
+    if (!positionAttribute) {
+      continue;
+    }
+
+    const indexAttribute = geometry.getIndex();
+    const readVertex = (vertexIndex: number, target: THREE.Vector3) => {
+      target.fromBufferAttribute(positionAttribute, vertexIndex).applyMatrix4(mesh.matrixWorld);
+    };
+
+    const triangleCount = indexAttribute
+      ? Math.floor(indexAttribute.count / 3)
+      : Math.floor(positionAttribute.count / 3);
+
+    for (let triangleIndex = 0; triangleIndex < triangleCount; triangleIndex += 1) {
+      const aIndex = indexAttribute ? indexAttribute.getX(triangleIndex * 3) : triangleIndex * 3;
+      const bIndex = indexAttribute ? indexAttribute.getX(triangleIndex * 3 + 1) : triangleIndex * 3 + 1;
+      const cIndex = indexAttribute ? indexAttribute.getX(triangleIndex * 3 + 2) : triangleIndex * 3 + 2;
+
+      readVertex(aIndex, triangleA);
+      readVertex(bIndex, triangleB);
+      readVertex(cIndex, triangleC);
+
+      const a = project(triangleA.x, triangleA.z);
+      const b = project(triangleB.x, triangleB.z);
+      const c = project(triangleC.x, triangleC.z);
+
+      context.beginPath();
+      context.moveTo(a.x, a.y);
+      context.lineTo(b.x, b.y);
+      context.lineTo(c.x, c.y);
+      context.closePath();
+      context.fill();
+      context.stroke();
+    }
+  }
+
+  return canvas.toDataURL("image/png");
 }
 
 export function alignCameraHeightToCollisionBounds(
@@ -112,7 +221,7 @@ export function alignCameraHeightToCollisionBounds(
   horizontalDirection.y = 0;
   if (horizontalDirection.lengthSq() > 0) {
     horizontalDirection.normalize();
-    const forwardNudge = THREE.MathUtils.clamp(Math.min(size.x, size.z) * 0.08, 0.2, 0.75);
+    const forwardNudge = THREE.MathUtils.clamp(Math.min(size.x, size.z) * 0.1, 0.24, 0.8);
     camera.position.addScaledVector(horizontalDirection, forwardNudge);
     target.addScaledVector(horizontalDirection, forwardNudge);
   }
@@ -192,13 +301,13 @@ export function prepareStartingView(
     const lookDownOffset = Math.max(size.y * 0.03, 0.05);
     const initialRaise = THREE.MathUtils.clamp(Math.max(maxSize * 0.025, 0.14), 0.14, 0.32);
     const startOffset =
-      dominantHorizontalAxis === "x" ? Math.max(size.x * 0.16, 0.8) : Math.max(size.z * 0.16, 0.8);
+      dominantHorizontalAxis === "x" ? Math.max(size.x * 0.1, 0.45) : Math.max(size.z * 0.1, 0.45);
     const northLookOffset = Math.max(size.z * 0.08, 0.45);
     const extraLift = THREE.MathUtils.clamp(size.y * 0.72, 2.2, 4.8);
     const forwardNudge =
       dominantHorizontalAxis === "x"
-        ? THREE.MathUtils.clamp(size.z * 0.06, 0.18, 0.65)
-        : THREE.MathUtils.clamp(size.z * 0.08, 0.24, 0.9);
+        ? THREE.MathUtils.clamp(size.z * 0.08, 0.22, 0.7)
+        : THREE.MathUtils.clamp(size.z * 0.1, 0.28, 0.95);
 
     start.y = THREE.MathUtils.clamp(
       Math.max(box.min.y + eyeHeight + initialRaise + extraLift, minimumInteriorY),
@@ -275,6 +384,67 @@ export function prepareStartingView(
     pitch: orientation.x,
     position: start.clone(),
     radius: Math.max(camera.position.distanceTo(target), 0.1),
+    target,
+    yaw: orientation.y,
+  };
+}
+
+export function applyInitialViewToCamera(
+  camera: THREE.PerspectiveCamera,
+  initialView: SceneInitialView,
+): StartingView {
+  const position = new THREE.Vector3(
+    initialView.position.x,
+    initialView.position.y,
+    initialView.position.z,
+  );
+  const target = new THREE.Vector3(
+    initialView.target.x,
+    initialView.target.y,
+    initialView.target.z,
+  );
+  const direction = target.clone().sub(position).normalize();
+  const yaw = THREE.MathUtils.euclideanModulo(
+    Math.atan2(direction.x, -direction.z) + Math.PI,
+    Math.PI * 2,
+  ) - Math.PI;
+  const pitch = Math.asin(THREE.MathUtils.clamp(direction.y, -1, 1));
+  camera.position.copy(position);
+  camera.lookAt(target);
+  camera.updateProjectionMatrix();
+
+  return {
+    moveSpeed: 0.5,
+    pitch,
+    position: position.clone(),
+    radius: Math.max(position.distanceTo(target), 0.1),
+    target,
+    yaw,
+  };
+}
+
+export function prepareCenteredViewFromBounds(
+  camera: THREE.PerspectiveCamera,
+  bounds: THREE.Box3,
+): StartingView {
+  const center = bounds.getCenter(new THREE.Vector3());
+  const size = bounds.getSize(new THREE.Vector3());
+  const eyeHeight = THREE.MathUtils.clamp(size.y * 0.1, 1.1, 1.75);
+  const insetY = THREE.MathUtils.clamp(center.y, bounds.min.y + 0.95, bounds.max.y - 0.2);
+  const position = new THREE.Vector3(center.x, Math.max(insetY, bounds.min.y + eyeHeight), center.z);
+  const forwardOffset = THREE.MathUtils.clamp(Math.max(size.z * 0.18, 0.9), 0.9, 3.2);
+  const target = new THREE.Vector3(center.x, position.y - 0.05, center.z - forwardOffset);
+  const orientation = new THREE.Euler(0, 0, 0, "YXZ");
+  camera.position.copy(position);
+  camera.lookAt(target);
+  orientation.setFromQuaternion(camera.quaternion, "YXZ");
+  camera.updateProjectionMatrix();
+
+  return {
+    moveSpeed: Math.max(Math.max(size.x, size.z) * 0.2, 0.35),
+    pitch: orientation.x,
+    position: position.clone(),
+    radius: Math.max(position.distanceTo(target), 0.1),
     target,
     yaw: orientation.y,
   };

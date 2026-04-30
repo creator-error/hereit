@@ -68,6 +68,10 @@ export async function PUT(request: Request, context: RouteContext) {
 
   const nextRoles = sortRoles(roles);
 
+  if (nextRoles.length !== 1) {
+    return Response.json({ error: "exactly one role must be selected" }, { status: 400 });
+  }
+
   if (!canSubmitRoleSet(actorRoles, nextRoles, { bootstrap: !hasAdmin })) {
     return Response.json({ error: "Forbidden role set" }, { status: 403 });
   }

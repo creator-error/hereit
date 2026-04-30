@@ -36,8 +36,62 @@ export type ViewerLoadingState = {
   detail: string;
 };
 
+export type SceneInitialView = {
+  position: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  target: {
+    x: number;
+    y: number;
+    z: number;
+  };
+};
+
+export type SparkScenePlacement =
+  | {
+      gain: number;
+      id?: string;
+      kind: "audio";
+      label: string;
+      loop: boolean;
+      position: {
+        x: number;
+        y: number;
+        z: number;
+      };
+      refDistance?: number;
+      maxDistance?: number;
+      rolloffFactor?: number;
+      selected?: boolean;
+      url: string;
+    }
+  | {
+      id?: string;
+      kind: "tag";
+      label: string;
+      linkUrl?: string | null;
+      title: string;
+      position: {
+        x: number;
+        y: number;
+        z: number;
+      };
+      selected?: boolean;
+    };
+
+export type SparkSceneCreatePoint = {
+  x: number;
+  y: number;
+  z: number;
+};
+
+export type SparkSceneTagSelection = Extract<SparkScenePlacement, { kind: "tag" }>;
+
 export type SparkAudioSource = {
   gain: number;
+  id?: string;
   loop: boolean;
   name: string;
   position: {
@@ -48,6 +102,7 @@ export type SparkAudioSource = {
   refDistance?: number;
   maxDistance?: number;
   rolloffFactor?: number;
+  selected?: boolean;
   url: string;
 };
 
@@ -57,9 +112,14 @@ export type MovementControlKey = keyof Pick<
 >;
 
 export type SparkSceneProps = {
-  audioSources?: SparkAudioSource[];
   collisionAssetUrl?: string | null;
+  initialView?: SceneInitialView | null;
+  placements?: SparkScenePlacement[];
+  onCreatePlacementAtPoint?: (position: SparkSceneCreatePoint) => void;
   onLoadingStateChange?: (state: ViewerLoadingState) => void;
+  onSelectTag?: (tag: SparkSceneTagSelection | null) => void;
+  onViewStateChange?: (view: SceneInitialView) => void;
+  reducedControls?: boolean;
   soundEnabled?: boolean;
   splatAssetUrl?: string | null;
   showCollisionMesh?: boolean;

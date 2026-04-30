@@ -44,8 +44,8 @@ export default async function NewScenePage({ searchParams }: PageProps) {
       <main className="px-6 py-8">
         <div className="mx-auto max-w-5xl space-y-6">
           <section className="rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.16),_transparent_36%),linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-8 shadow-2xl shadow-black/30">
-            <p className="text-sm uppercase tracking-[0.28em] text-sky-300">New Scene</p>
-            <h1 className="mt-3 text-4xl font-semibold">Create a scene inside an organization</h1>
+            <p className="text-sm uppercase tracking-[0.28em] text-sky-300">新規シーン</p>
+            <h1 className="mt-3 text-4xl font-semibold">組織内にシーンを作成</h1>
           </section>
           <SceneEditorForm
             mode="create"
