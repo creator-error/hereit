@@ -14,7 +14,7 @@
 	},
 	"d1_databases": [
 		{
-			"binding": "hereit",
+			"binding": "DB",
 			"database_name": "hereit",
 			"database_id": "deec0664-0e44-4cb2-b6e2-60b6d65e9755",
 			"remote": true
