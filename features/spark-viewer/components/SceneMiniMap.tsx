@@ -1,5 +1,6 @@
 "use client";
 
+import { Panel } from "@/components/ui/Panel";
 import type { SparkScenePlacement } from "@/features/spark-viewer/sceneTypes";
 
 type SceneMiniMapProps = {
@@ -33,22 +34,16 @@ export function SceneMiniMap({
   }
 
   return (
-    <div className="pointer-events-none absolute bottom-[max(20px,calc(env(safe-area-inset-bottom)+20px))] right-[max(20px,calc(env(safe-area-inset-right)+20px))] z-[3] w-[210px] max-w-[calc(100vw-40px)] rounded-[22px] border border-[rgba(212,175,55,0.38)] bg-[linear-gradient(180deg,rgba(18,24,34,0.92),rgba(10,14,22,0.9))] p-3 text-[rgba(255,255,255,0.92)] shadow-[0_24px_48px_rgba(0,0,0,0.42)] backdrop-blur-[12px]">
-      <div className="pointer-events-none absolute inset-0 rounded-[22px] bg-[linear-gradient(180deg,rgba(255,255,255,0.06),transparent_35%)]" />
+    <Panel className="py-2 absolute bottom-[max(20px,calc(env(safe-area-inset-bottom)+32px))] right-[max(20px,calc(env(safe-area-inset-right)+32px+96px))] z-[3] w-[320px] max-w-[calc(100vw-40px)] ">
       <div className="relative">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[11px] tracking-[0.2em] text-[#e4c46a]">フロアマップ</p>
-          <div className="h-px flex-1 bg-[linear-gradient(90deg,rgba(212,175,55,0.65),rgba(212,175,55,0))]" />
-        </div>
-        <div className="relative mt-3 aspect-square overflow-hidden rounded-[14px] border border-[rgba(212,175,55,0.3)] bg-[linear-gradient(180deg,rgba(15,23,42,0.95),rgba(8,17,30,0.88))]">
-          {mapImageDataUrl ? (
+        <div className="relative mt-2 aspect-square overflow-hidden rounded-[14px] border border-[rgba(212,175,55,0.3)] bg-[linear-gradient(180deg,rgba(15,23,42,0.95),rgba(8,17,30,0.88))]">
+          {mapImageDataUrl && (
             <img
               src={mapImageDataUrl}
               alt="Scene map"
               className="absolute inset-0 h-full w-full object-cover opacity-92"
             />
-          ) : null}
-          <div className="absolute inset-2 rounded-[10px] border border-[rgba(255,255,255,0.08)]" />
+          )}
           {placements.map((placement) => {
             const left = normalize(placement.position.x, mapBounds.minX, mapBounds.maxX);
             const top = normalize(placement.position.z, mapBounds.minZ, mapBounds.maxZ);
@@ -76,11 +71,11 @@ export function SceneMiniMap({
             />
           ) : null}
         </div>
-        {/* <p className="mt-3 text-center text-[11px] text-white/76">フロアマップ</p> */}
-        <p className="mt-1 text-center text-[11px] text-white/54">
+        <p className="mt-3 text-center text-[1rem] text-white/76">フロアマップ</p>
+        <p className="mt-1 text-center text-[0.5rem] text-white/54">
           金: 現在位置 / 青: 音声 / 黄: タグ
         </p>
       </div>
-    </div>
+    </Panel>
   );
 }

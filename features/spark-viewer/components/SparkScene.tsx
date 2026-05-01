@@ -49,7 +49,6 @@ export function SparkScene({
   onLoadingStateChange,
   onSelectTag,
   onViewStateChange,
-  reducedControls = false,
   soundEnabled = false,
   splatAssetUrl = SPARK_ASSET_URL,
   showCollisionMesh = false,
@@ -162,14 +161,8 @@ export function SparkScene({
     setMovementControl(key, false);
   };
 
-  const setMovementJoystick = (next: JoystickVector) => {
-    movementJoystickRef.current = next;
-    setJoystickOffset(next);
-    requestRenderRef.current();
-  };
-
-  const resetMovementJoystick = () => {
-    setMovementJoystick({ x: 0, y: 0 });
+  const setSoundEnabled = (enabled: boolean) => {
+    soundEnabled = !!enabled;
   };
 
   useEffect(() => {
@@ -483,10 +476,6 @@ export function SparkScene({
         case "Space":
           input.up = true;
           break;
-        // case "ShiftLeft":
-        // case "ShiftRight":
-        //   input.faster = true;
-        // break;
         default:
           return;
       }
@@ -520,10 +509,6 @@ export function SparkScene({
         case "Space":
           input.up = false;
           break;
-        // case "ShiftLeft":
-        // case "ShiftRight":
-        //   input.faster = false;
-        //   break;
         default:
           return;
       }
@@ -541,7 +526,6 @@ export function SparkScene({
       input.up = false;
       input.down = false;
       input.faster = false;
-      resetMovementJoystick();
     };
 
     const updateMovement = (deltaSeconds: number) => {
@@ -1154,59 +1138,10 @@ export function SparkScene({
       className="relative h-full min-h-0 w-full overflow-hidden rounded-[24px] bg-[#08111e]"
     >
       <ViewerHud
-        onJoystickPointerDown={(event) => {
-          const bounds = event.currentTarget.getBoundingClientRect();
-          const radius = bounds.width * 0.5;
-          const knobRadius = 26;
-          const centerX = bounds.left + bounds.width * 0.5;
-          const centerY = bounds.top + bounds.height * 0.5;
-          const rawX = event.clientX - centerX;
-          const rawY = event.clientY - centerY;
-          const maxDistance = Math.max(radius - knobRadius, 1);
-          const distance = Math.hypot(rawX, rawY);
-          const scale = distance > maxDistance ? maxDistance / distance : 1;
-          event.preventDefault();
-          event.currentTarget.setPointerCapture(event.pointerId);
-          setMovementJoystick({
-            x: (rawX * scale) / maxDistance,
-            y: (rawY * scale) / maxDistance,
-          });
-        }}
-        onJoystickPointerMove={(event) => {
-          if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
-            return;
-          }
-          const bounds = event.currentTarget.getBoundingClientRect();
-          const radius = bounds.width * 0.5;
-          const knobRadius = 26;
-          const centerX = bounds.left + bounds.width * 0.5;
-          const centerY = bounds.top + bounds.height * 0.5;
-          const rawX = event.clientX - centerX;
-          const rawY = event.clientY - centerY;
-          const maxDistance = Math.max(radius - knobRadius, 1);
-          const distance = Math.hypot(rawX, rawY);
-          const scale = distance > maxDistance ? maxDistance / distance : 1;
-          setMovementJoystick({
-            x: (rawX * scale) / maxDistance,
-            y: (rawY * scale) / maxDistance,
-          });
-        }}
-        onJoystickPointerUp={(event) => {
-          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-            event.currentTarget.releasePointerCapture(event.pointerId);
-          }
-          resetMovementJoystick();
-        }}
-        onJoystickPointerLeave={(event) => {
-          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-            return;
-          }
-          resetMovementJoystick();
-        }}
         placements={placementsRef.current ?? []}
-        reducedControls={reducedControls}
         setMovementControl={setMovementControl}
         endMovementControl={endMovementControl}
+        setSoundEnabled={setSoundEnabled}
       />
     </div>
   );
