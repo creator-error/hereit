@@ -38,8 +38,8 @@ export function SceneMiniMap({
     <Panel
       className={jc(
         "py-2",
-        "absolute bottom-[max(20px,calc(env(safe-area-inset-bottom)+32px))] right-[max(20px,calc(env(safe-area-inset-right)+32px+96px))] z-[3]",
-        "w-[320px] max-w-[calc(100vw-40px)]",
+        "absolute bottom-[max(20px,calc(env(safe-area-inset-bottom)+32px))] right-[max(20px,calc(env(safe-area-inset-right)+16px+96px))] z-[3]",
+        "w-[248px] max-w-[calc(100vw-40px)]",
         "hidden sm:block",
       )}
     >

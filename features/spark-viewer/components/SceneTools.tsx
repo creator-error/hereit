@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useToast } from "@/components/layout/ToastProvider";
 import { Button } from "@/components/ui/Button";
-import { Megaphone, MegaphoneOff, ChevronUp, ChevronDown, Share2 } from "lucide-react";
+import { Megaphone, MegaphoneOff, ChevronsUp, ChevronsDown, Share2 } from "lucide-react";
 import { joinClasses } from "@/components/util/joinClasses";
 
 type ViewerToolsProps = {
@@ -62,7 +62,7 @@ export function SceneTools({
         onPointerCancel={() => endMovementControl("up")}
         onPointerLeave={() => endMovementControl("up")}
       >
-        <ChevronUp className="h-6 w-6" />
+        <ChevronsUp className="h-6 w-6" />
       </Button>
       <Button
         variant="primary"
@@ -76,7 +76,7 @@ export function SceneTools({
         onPointerCancel={() => endMovementControl("down")}
         onPointerLeave={() => endMovementControl("down")}
       >
-        <ChevronDown className="h-6 w-6" />
+        <ChevronsDown className="h-6 w-6" />
       </Button>
     </div>
   );

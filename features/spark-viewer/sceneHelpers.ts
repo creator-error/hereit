@@ -125,11 +125,42 @@ export function createTagSprite(selected = false) {
   return sprite;
 }
 
+function createAudioSprite(selected = false) {
+  const svg = `
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+       stroke="${selected ? "#fff" : "#3795d4"}"
+       fill="none" stroke-width="2">
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+    <path d="M15.5 8.5a5 5 0 0 1 0 7"/>
+    <path d="M19 5a9 9 0 0 1 0 14"/>
+  </svg>
+  `;
+
+  const blob = new Blob([svg], { type: "image/svg+xml" });
+  const url = URL.createObjectURL(blob);
+
+  const texture = new THREE.TextureLoader().load(url);
+
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+  });
+
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(0.25, 0.25, 1);
+  sprite.renderOrder = 999;
+
+  return sprite;
+}
+
 export function createPlacementMarker(kind: "audio" | "tag", selected = false) {
   if (kind === "tag") {
     return createTagSprite(selected);
   }
 
+  return createAudioSprite(selected);
   const marker = new THREE.Mesh(
     new THREE.SphereGeometry(selected ? 0.12 : 0.08, 16, 12),
     new THREE.MeshBasicMaterial({
