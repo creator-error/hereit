@@ -127,23 +127,25 @@ export function SparkScene({
   }, [showCollisionMesh]);
 
   useEffect(() => {
-    const context = audioListenerRef.current?.context;
+    void (async () => {
+      const context = audioListenerRef.current?.context;
 
-    // iOS / Chrome 対策（これがないと無音になる）
-    if (soundEnabled && context?.state === "suspended") {
-      void context.resume();
-    }
-
-    for (const audio of positionalAudioRef.current) {
-      if (soundEnabled) {
-        if (!audio.isPlaying && audio.buffer) {
-          audio.play();
-        }
-      } else if (audio.isPlaying) {
-        audio.pause();
+      if (soundEnabled && context?.state === "suspended") {
+        await context.resume();
       }
-    }
+
+      for (const audio of positionalAudioRef.current) {
+        if (soundEnabled) {
+          if (!audio.isPlaying && audio.buffer) {
+            audio.play();
+          }
+        } else if (audio.isPlaying) {
+          audio.pause();
+        }
+      }
+    })();
   }, [soundEnabled]);
+
   const reportLoadingState = (state: ViewerLoadingState) => {
     const nextRank = state.active ? (state.mode === "progress" ? 1 : 2) : 3;
     const currentRank = loadingPhaseRankRef.current;
@@ -1053,7 +1055,6 @@ export function SparkScene({
     setMapCameraPosition,
     setMapImageDataUrl,
     setStatus,
-    soundEnabled,
     splatAssetUrl,
   ]);
 
@@ -1167,8 +1168,8 @@ export function SparkScene({
         placements={placementsRef.current ?? []}
         setMovementControl={setMovementControl}
         endMovementControl={endMovementControl}
-        setSoundEnabled={(enable) => {
-          onSoundEnabledChange?.(enable);
+        setSoundEnabled={(enabled) => {
+          onSoundEnabledChange?.(enabled);
         }}
       />
     </div>

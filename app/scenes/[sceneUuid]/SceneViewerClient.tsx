@@ -93,6 +93,7 @@ export function SceneViewerClient({
             placements={placements}
             reducedControls={fullscreen && !canCreatePlacement}
             soundEnabled={soundEnabled}
+            onSoundEnabledChange={setSoundEnabled}
             splatAssetUrl={splatAssetUrl}
             showCollisionMesh={showCollisionMesh}
             onLoadingStateChange={setViewerLoading}
