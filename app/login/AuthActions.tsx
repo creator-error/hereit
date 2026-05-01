@@ -27,7 +27,7 @@ export function AuthActions({ isAuthenticated, isConfigured }: AuthActionsProps)
   return (
     <button
       type="button"
-      onClick={() => signIn("google", { callbackUrl: "/login" })}
+      onClick={() => signIn("google", { callbackUrl: "/admin" })}
       className="inline-flex items-center justify-center rounded-lg bg-[#f59e0b] px-5 py-3 text-sm font-semibold text-[#0f1729] transition hover:bg-[#fbbf24]"
     >
       Googleでログイン

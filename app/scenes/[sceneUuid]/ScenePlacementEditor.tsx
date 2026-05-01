@@ -49,10 +49,15 @@ type ScenePlacementEditorProps = {
 };
 
 function formatPosition(position: { x: number; y: number; z: number }) {
+  console.log(JSON.stringify(position));
   return `${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)}`;
 }
 
-export function createAudioPlacementDraft(position: { x: number; y: number; z: number }): EditableScenePlacementDraft {
+export function createAudioPlacementDraft(position: {
+  x: number;
+  y: number;
+  z: number;
+}): EditableScenePlacementDraft {
   return {
     id: crypto.randomUUID(),
     kind: "audio",
@@ -107,6 +112,7 @@ export function ScenePlacementEditor({
             </div>
           ) : null}
           {placements.map((placement, index) => {
+            if (!placement.id) return null;
             const active = placement.id === selectedPlacementId;
             const title = placement.kind === "audio" ? "音声" : "タグ";
             const detail =
@@ -118,9 +124,7 @@ export function ScenePlacementEditor({
               <div
                 key={placement.id}
                 className={`rounded-3xl border p-4 transition ${
-                  active
-                    ? "border-sky-300/40 bg-sky-500/10"
-                    : "border-white/10 bg-white/[0.03]"
+                  active ? "border-sky-300/40 bg-sky-500/10" : "border-white/10 bg-white/[0.03]"
                 }`}
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">

@@ -1309,7 +1309,7 @@ export async function replaceScenePlacementsForSceneId(input: {
           position_z,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
         [
           crypto.randomUUID(),
