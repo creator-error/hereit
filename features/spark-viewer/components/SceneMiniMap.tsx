@@ -1,6 +1,7 @@
 "use client";
 
 import { Panel } from "@/components/ui/Panel";
+import { jc } from "@/components/util/joinClasses";
 import type { SparkScenePlacement } from "@/features/spark-viewer/sceneTypes";
 
 type SceneMiniMapProps = {
@@ -34,7 +35,14 @@ export function SceneMiniMap({
   }
 
   return (
-    <Panel className="py-2 absolute bottom-[max(20px,calc(env(safe-area-inset-bottom)+32px))] right-[max(20px,calc(env(safe-area-inset-right)+32px+96px))] z-[3] w-[320px] max-w-[calc(100vw-40px)] sm:hidden">
+    <Panel
+      className={jc(
+        "py-2",
+        "absolute bottom-[max(20px,calc(env(safe-area-inset-bottom)+32px))] right-[max(20px,calc(env(safe-area-inset-right)+32px+96px))] z-[3]",
+        "w-[320px] max-w-[calc(100vw-40px)]",
+        "hidden sm:block",
+      )}
+    >
       <div className="relative">
         <div className="relative mt-2 aspect-square overflow-hidden rounded-[14px] border border-[rgba(212,175,55,0.3)] bg-[linear-gradient(180deg,rgba(15,23,42,0.95),rgba(8,17,30,0.88))]">
           {mapImageDataUrl && (
