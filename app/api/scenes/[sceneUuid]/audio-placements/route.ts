@@ -1,8 +1,8 @@
 import { getAppSession } from "@/server/auth/session";
 import { sortRoles } from "@/features/admin/roles";
 import {
-  listAudioPlacementsForSceneIdActor,
-  replaceAudioPlacementsForSceneId,
+  listScenePlacementsForSceneIdActor,
+  replaceScenePlacementsForSceneId,
 } from "@/server/repositories/user-repository";
 
 type RouteContext = {
@@ -13,38 +13,32 @@ type RouteContext = {
 
 type AudioPlacementBody = {
   placements?: Array<{
-    name?: unknown;
-    url?: unknown;
-    originalFilename?: unknown;
-    mimeType?: unknown;
-    byteSize?: unknown;
+    kind?: unknown;
     position?: {
       x?: unknown;
       y?: unknown;
       z?: unknown;
     };
-    rotation?: {
-      x?: unknown;
-      y?: unknown;
-      z?: unknown;
-    };
+    url?: unknown;
     gain?: unknown;
     loop?: unknown;
+    linkUrl?: unknown;
+    title?: unknown;
+    description?: unknown;
   }>;
 };
 
 export async function GET(_request: Request, context: RouteContext) {
   const session = await getAppSession();
-  const actor =
-    session?.user?.id
-      ? {
-          userId: session.user.id,
-          roles: sortRoles(session.roles ?? []),
-        }
-      : null;
+  const actor = session?.user?.id
+    ? {
+        userId: session.user.id,
+        roles: sortRoles(session.roles ?? []),
+      }
+    : null;
 
   const { sceneUuid: sceneId } = await context.params;
-  const placements = await listAudioPlacementsForSceneIdActor(sceneId, actor);
+  const placements = await listScenePlacementsForSceneIdActor(sceneId, actor);
 
   if (!placements) {
     return Response.json({ error: "Scene not found" }, { status: 404 });
@@ -64,30 +58,25 @@ export async function PUT(request: Request, context: RouteContext) {
   const body = (await request.json()) as AudioPlacementBody;
   const placements = Array.isArray(body.placements) ? body.placements : [];
 
+  console.log("Received placements:", placements);
   try {
-    const saved = await replaceAudioPlacementsForSceneId({
+    const saved = await replaceScenePlacementsForSceneId({
       sceneId,
       actorUserId: session.user.id,
       actorRoles: sortRoles(session.roles ?? []),
       placements: placements.map((placement) => ({
-        name: typeof placement.name === "string" ? placement.name : null,
-        url: typeof placement.url === "string" ? placement.url : "",
-        originalFilename:
-          typeof placement.originalFilename === "string" ? placement.originalFilename : null,
-        mimeType: typeof placement.mimeType === "string" ? placement.mimeType : null,
-        byteSize: typeof placement.byteSize === "number" ? placement.byteSize : null,
+        kind: placement.kind === "tag" ? "tag" : "audio",
         position: {
           x: typeof placement.position?.x === "number" ? placement.position.x : 0,
           y: typeof placement.position?.y === "number" ? placement.position.y : 0,
           z: typeof placement.position?.z === "number" ? placement.position.z : 0,
         },
-        rotation: {
-          x: typeof placement.rotation?.x === "number" ? placement.rotation.x : 0,
-          y: typeof placement.rotation?.y === "number" ? placement.rotation.y : 0,
-          z: typeof placement.rotation?.z === "number" ? placement.rotation.z : 0,
-        },
+        url: typeof placement.url === "string" ? placement.url : null,
         gain: typeof placement.gain === "number" ? placement.gain : 1,
         loop: placement.loop === true,
+        linkUrl: typeof placement.linkUrl === "string" ? placement.linkUrl : null,
+        title: typeof placement.title === "string" ? placement.title : null,
+        description: typeof placement.description === "string" ? placement.description : null,
       })),
     });
 

@@ -146,3 +146,6 @@ vite.config.ts.timestamp-*
 *.spz
 *.mp3
 *.wav
+.wrangler
+*storybook.log
+storybook-static

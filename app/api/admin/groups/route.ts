@@ -8,6 +8,7 @@ import {
 type OrganizationBody = {
   name?: unknown;
   description?: unknown;
+  logoUrl?: unknown;
 };
 
 function isAuthenticated(session: Awaited<ReturnType<typeof getAppSession>>) {
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
 
   const actorRoles = sortRoles(session!.roles ?? []);
 
-  if (!hasWorkspaceAccess(actorRoles)) {
+  if (!canEditWorkspace(actorRoles)) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -69,7 +70,9 @@ export async function POST(request: Request) {
   const organizationId = await createOrganization({
     name: body.name,
     description: typeof body.description === "string" ? body.description.trim() || null : null,
+    logoUrl: typeof body.logoUrl === "string" ? body.logoUrl.trim() || null : null,
     createdByUserId: actorUserId,
+    actorRoles,
   });
 
   return Response.json({ organizationId }, { status: 201 });

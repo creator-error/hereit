@@ -3,9 +3,9 @@ export const ROLE_ORDER = ["admin", "editor", "viewer"] as const;
 export type RoleName = (typeof ROLE_ORDER)[number];
 
 export const ROLE_LABELS: Record<RoleName, string> = {
-  admin: "Admin",
-  editor: "Editor",
-  viewer: "Viewer",
+  admin: "管理者",
+  editor: "編集者",
+  viewer: "閲覧者",
 };
 
 export const WORKSPACE_ACCESS_ROLES: RoleName[] = ["admin", "editor", "viewer"];
@@ -39,6 +39,11 @@ export function sortRoles(roles: string[]): string[] {
 
     return left.localeCompare(right);
   });
+}
+
+export function getPrimaryRole(roles: string[] | undefined): RoleName | null {
+  const normalized = sortRoles(normalizeRoles(roles));
+  return (normalized[0] as RoleName | undefined) ?? null;
 }
 
 export function hasWorkspaceAccess(roles: string[] | undefined): boolean {
@@ -92,6 +97,10 @@ export function canSubmitRoleSet(
 
   if (options?.bootstrap) {
     return sortedRoles.length === 1 && sortedRoles[0] === "admin";
+  }
+
+  if (sortedRoles.length !== 1) {
+    return false;
   }
 
   if (isAdmin(actorRoles)) {

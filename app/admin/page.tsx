@@ -23,7 +23,7 @@ export default async function AdminPage() {
       <main className="min-h-screen bg-[#0b1220] px-6 py-16 text-white">
         <div className="mx-auto max-w-3xl rounded-3xl border border-rose-400/20 bg-rose-500/10 p-8">
           <p className="text-sm uppercase tracking-[0.24em] text-rose-200">403</p>
-          <h1 className="mt-3 text-3xl font-semibold">Admin access denied</h1>
+          <h1 className="mt-3 text-3xl font-semibold">管理画面にアクセスできません</h1>
           <p className="mt-4 text-sm leading-7 text-white/78">
             {bootstrapMode
               ? "`/admin` bootstrap は role 未設定のログインユーザー本人に限定されます。"

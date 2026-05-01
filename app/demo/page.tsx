@@ -5,8 +5,7 @@ import dynamic from "next/dynamic";
 import type { ViewerLoadingState } from "@/features/spark-viewer/components/SparkScene";
 
 const SparkScene = dynamic(
-  () =>
-    import("@/features/spark-viewer/components/SparkScene").then((mod) => mod.SparkScene),
+  () => import("@/features/spark-viewer/components/SparkScene").then((mod) => mod.SparkScene),
   { ssr: false },
 );
 
@@ -80,6 +79,7 @@ export default function SparkDemoPage() {
           <SparkScene
             onLoadingStateChange={setViewerLoading}
             soundEnabled={soundEnabled}
+            onSoundEnabledChange={setSoundEnabled}
             showCollisionMesh={showCollisionMesh}
           />
         </div>

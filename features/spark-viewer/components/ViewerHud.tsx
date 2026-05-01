@@ -1,44 +1,40 @@
 "use client";
 
-import { CompassHud } from "@/features/spark-viewer/components/CompassHud";
-import { MovementControlsHud } from "@/features/spark-viewer/components/MovementControlsHud";
+import { SceneMiniMap } from "@/features/spark-viewer/components/SceneMiniMap";
+import type { SparkScenePlacement } from "@/features/spark-viewer/sceneTypes";
 import { useViewerUiStore } from "@/features/spark-viewer/stores/viewerUiStore";
+import { ViewerTools } from "./ViewerTools";
 
 type MovementControlKey = "forward" | "back" | "left" | "right" | "up" | "down";
 
 type ViewerHudProps = {
-  endMovementControl: (key: MovementControlKey) => void;
-  onJoystickPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
-  onJoystickPointerLeave: (event: React.PointerEvent<HTMLDivElement>) => void;
-  onJoystickPointerMove: (event: React.PointerEvent<HTMLDivElement>) => void;
-  onJoystickPointerUp: (event: React.PointerEvent<HTMLDivElement>) => void;
+  placements: SparkScenePlacement[];
   setMovementControl: (key: MovementControlKey, active: boolean) => void;
+  endMovementControl: (key: MovementControlKey) => void;
+  setSoundEnabled: (enabled: boolean) => void | null;
 };
 
 export function ViewerHud({
-  endMovementControl,
-  onJoystickPointerDown,
-  onJoystickPointerLeave,
-  onJoystickPointerMove,
-  onJoystickPointerUp,
+  placements,
   setMovementControl,
+  endMovementControl,
+  setSoundEnabled,
 }: ViewerHudProps) {
-  const { compass, joystickOffset, status } = useViewerUiStore();
+  const { mapBounds, mapCameraPosition, mapImageDataUrl } = useViewerUiStore();
 
   return (
     <div className="contents">
-      <div className="pointer-events-none absolute top-4 right-4 z-[1] max-w-[min(360px,calc(100vw-32px))] rounded-[16px] bg-[rgba(8,17,30,0.7)] px-3 py-2 text-[12px] leading-5 text-[rgba(255,255,255,0.92)] backdrop-blur-[10px]">
-        {status}
-      </div>
-      <CompassHud compass={compass} />
-      <MovementControlsHud
-        joystickOffset={joystickOffset}
-        onJoystickPointerDown={onJoystickPointerDown}
-        onJoystickPointerMove={onJoystickPointerMove}
-        onJoystickPointerUp={onJoystickPointerUp}
-        onJoystickPointerLeave={onJoystickPointerLeave}
+      <SceneMiniMap
+        cameraPosition={mapCameraPosition}
+        mapImageDataUrl={mapImageDataUrl}
+        mapBounds={mapBounds}
+        placements={placements}
+      />
+      <ViewerTools
+        className="absolute right-[max(20px,env(safe-area-inset-right))] bottom-[max(32px,calc(env(safe-area-inset-bottom)+24px))] "
         setMovementControl={setMovementControl}
         endMovementControl={endMovementControl}
+        setSoundEnabled={setSoundEnabled}
       />
     </div>
   );

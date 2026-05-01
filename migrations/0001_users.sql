@@ -1,3 +1,4 @@
+-- users
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   email TEXT,
@@ -33,10 +34,13 @@ CREATE TABLE IF NOT EXISTS user_roles (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- organizations
+
 CREATE TABLE IF NOT EXISTS organizations (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   description TEXT,
+  logo_url TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -51,6 +55,8 @@ CREATE TABLE IF NOT EXISTS organization_memberships (
   FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
 );
 
+-- scenes and assets
+
 CREATE TABLE IF NOT EXISTS scenes (
   id TEXT PRIMARY KEY,
   organization_id TEXT NOT NULL,
@@ -59,6 +65,12 @@ CREATE TABLE IF NOT EXISTS scenes (
   shared INTEGER NOT NULL DEFAULT 0,
   room_ply_url TEXT,
   room_glb_url TEXT,
+  initial_camera_x REAL,
+  initial_camera_y REAL,
+  initial_camera_z REAL,
+  initial_target_x REAL,
+  initial_target_y REAL,
+  initial_target_z REAL,
   created_by_user_id TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -87,41 +99,36 @@ CREATE TABLE IF NOT EXISTS assets (
 CREATE INDEX IF NOT EXISTS assets_scene_kind_idx
   ON assets (scene_id, kind);
 
-CREATE TABLE IF NOT EXISTS audio_files (
+CREATE TABLE IF NOT EXISTS scene_audio_placements (
   id TEXT PRIMARY KEY,
   scene_id TEXT NOT NULL,
   url TEXT NOT NULL,
-  original_filename TEXT,
-  mime_type TEXT,
-  byte_size INTEGER,
-  created_by_user_id TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE,
-  FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-);
-
-CREATE INDEX IF NOT EXISTS audio_files_scene_idx
-  ON audio_files (scene_id);
-
-CREATE TABLE IF NOT EXISTS audio_placements (
-  id TEXT PRIMARY KEY,
-  scene_id TEXT NOT NULL,
-  audio_file_id TEXT NOT NULL,
-  name TEXT,
   position_x REAL NOT NULL,
   position_y REAL NOT NULL,
   position_z REAL NOT NULL,
-  rotation_x REAL NOT NULL DEFAULT 0,
-  rotation_y REAL NOT NULL DEFAULT 0,
-  rotation_z REAL NOT NULL DEFAULT 0,
   gain REAL NOT NULL DEFAULT 1,
   loop_enabled INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE,
-  FOREIGN KEY (audio_file_id) REFERENCES audio_files(id) ON DELETE CASCADE
+  FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS audio_placements_scene_idx
-  ON audio_placements (scene_id);
+CREATE INDEX IF NOT EXISTS scene_audio_placements_scene_idx
+  ON scene_audio_placements (scene_id);
+
+CREATE TABLE IF NOT EXISTS scene_tags (
+  id TEXT PRIMARY KEY,
+  scene_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  link_url TEXT,
+  position_x REAL NOT NULL,
+  position_y REAL NOT NULL,
+  position_z REAL NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS scene_tags_scene_idx
+  ON scene_tags (scene_id);

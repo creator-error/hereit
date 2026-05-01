@@ -12,35 +12,23 @@ type RouteContext = {
 };
 
 type MembershipBody = {
-  memberships?: unknown;
+  organizationIds?: unknown;
 };
 
 function isAuthenticated(session: Awaited<ReturnType<typeof getAppSession>>) {
   return Boolean(session?.user?.id);
 }
 
-function parseMemberships(body: MembershipBody): { organizationId: string; role: string }[] | null {
-  if (!Array.isArray(body.memberships)) {
+function parseOrganizationIds(body: MembershipBody): string[] | null {
+  if (!Array.isArray(body.organizationIds)) {
     return null;
   }
 
-  const normalized = body.memberships.map((entry) => {
-    if (
-      !entry ||
-      typeof entry !== "object" ||
-      typeof (entry as { organizationId?: unknown }).organizationId !== "string" ||
-      typeof (entry as { role?: unknown }).role !== "string"
-    ) {
-      return null;
-    }
+  const organizationIds = body.organizationIds.filter(
+    (organizationId): organizationId is string => typeof organizationId === "string",
+  );
 
-    return {
-      organizationId: (entry as { organizationId: string }).organizationId,
-      role: (entry as { role: string }).role,
-    };
-  });
-
-  return normalized.every(Boolean) ? (normalized as { organizationId: string; role: string }[]) : null;
+  return organizationIds.length === body.organizationIds.length ? organizationIds : null;
 }
 
 export async function PUT(request: Request, context: RouteContext) {
@@ -58,11 +46,11 @@ export async function PUT(request: Request, context: RouteContext) {
   }
 
   const body = (await request.json()) as MembershipBody;
-  const memberships = parseMemberships(body);
+  const organizationIds = parseOrganizationIds(body);
 
-  if (!memberships) {
+  if (!organizationIds) {
     return Response.json(
-      { error: "memberships must be an array of { organizationId, role }" },
+      { error: "organizationIds must be a string array" },
       { status: 400 },
     );
   }
@@ -70,7 +58,7 @@ export async function PUT(request: Request, context: RouteContext) {
   const { userId } = await context.params;
   const user = await replaceUserOrganizationMemberships({
     userId,
-    memberships,
+    organizationIds,
   });
 
   if (!user) {
