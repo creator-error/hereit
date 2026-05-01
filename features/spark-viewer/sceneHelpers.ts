@@ -77,30 +77,57 @@ export function collidesWithRoom(
   });
 }
 
+export function createTagSprite(selected = false) {
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+
+  const ctx = canvas.getContext("2d")!;
+  ctx.clearRect(0, 0, size, size);
+
+  const center = size / 2;
+
+  // outer glow
+  ctx.beginPath();
+  ctx.arc(center, center, 34, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(212, 175, 55, 0.18)";
+  ctx.fill();
+
+  // ring
+  ctx.beginPath();
+  ctx.arc(center, center, 24, 0, Math.PI * 2);
+  ctx.strokeStyle = selected ? "#fff3b0" : "#d4af37";
+  ctx.lineWidth = 5;
+  ctx.stroke();
+
+  // core
+  ctx.beginPath();
+  ctx.arc(center, center, 9, 0, Math.PI * 2);
+  ctx.fillStyle = selected ? "#fff8db" : "#f4d574";
+  ctx.fill();
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+  });
+
+  const sprite = new THREE.Sprite(material);
+  sprite.name = "tag-marker";
+  sprite.scale.set(selected ? 0.42 : 0.34, selected ? 0.42 : 0.34, 1);
+  sprite.renderOrder = 999;
+
+  return sprite;
+}
+
 export function createPlacementMarker(kind: "audio" | "tag", selected = false) {
   if (kind === "tag") {
-    const group = new THREE.Group();
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(selected ? 0.11 : 0.09, 0.018, 16, 32),
-      new THREE.MeshBasicMaterial({
-        color: selected ? "#f8e39a" : "#d4af37",
-        transparent: true,
-        opacity: 0.98,
-      }),
-    );
-    ring.rotation.x = Math.PI / 2;
-    const core = new THREE.Mesh(
-      new THREE.SphereGeometry(selected ? 0.038 : 0.03, 16, 12),
-      new THREE.MeshBasicMaterial({
-        color: selected ? "#fff8db" : "#f4d574",
-        transparent: true,
-        opacity: 0.95,
-      }),
-    );
-    group.add(ring);
-    group.add(core);
-    group.name = "tag-marker";
-    return group;
+    return createTagSprite(selected);
   }
 
   const marker = new THREE.Mesh(
@@ -175,8 +202,12 @@ export function renderTopDownMapFromCollisionMeshes(
 
     for (let triangleIndex = 0; triangleIndex < triangleCount; triangleIndex += 1) {
       const aIndex = indexAttribute ? indexAttribute.getX(triangleIndex * 3) : triangleIndex * 3;
-      const bIndex = indexAttribute ? indexAttribute.getX(triangleIndex * 3 + 1) : triangleIndex * 3 + 1;
-      const cIndex = indexAttribute ? indexAttribute.getX(triangleIndex * 3 + 2) : triangleIndex * 3 + 2;
+      const bIndex = indexAttribute
+        ? indexAttribute.getX(triangleIndex * 3 + 1)
+        : triangleIndex * 3 + 1;
+      const cIndex = indexAttribute
+        ? indexAttribute.getX(triangleIndex * 3 + 2)
+        : triangleIndex * 3 + 2;
 
       readVertex(aIndex, triangleA);
       readVertex(bIndex, triangleB);
@@ -208,11 +239,7 @@ export function alignCameraHeightToCollisionBounds(
   const floorY = bounds.min.y;
   const ceilingY = bounds.max.y;
   const desiredEyeHeight = THREE.MathUtils.clamp(size.y * 0.1, 1.1, 1.75);
-  const desiredY = THREE.MathUtils.clamp(
-    floorY + desiredEyeHeight,
-    floorY + 0.95,
-    ceilingY - 0.2,
-  );
+  const desiredY = THREE.MathUtils.clamp(floorY + desiredEyeHeight, floorY + 0.95, ceilingY - 0.2);
   const deltaY = desiredY - camera.position.y;
   camera.position.y = desiredY;
   target.y += deltaY;
@@ -228,8 +255,16 @@ export function alignCameraHeightToCollisionBounds(
 
   const insetX = THREE.MathUtils.clamp(size.x * 0.08, 0.2, 0.8);
   const insetZ = THREE.MathUtils.clamp(size.z * 0.08, 0.2, 0.8);
-  camera.position.x = THREE.MathUtils.clamp(camera.position.x, bounds.min.x + insetX, bounds.max.x - insetX);
-  camera.position.z = THREE.MathUtils.clamp(camera.position.z, bounds.min.z + insetZ, bounds.max.z - insetZ);
+  camera.position.x = THREE.MathUtils.clamp(
+    camera.position.x,
+    bounds.min.x + insetX,
+    bounds.max.x - insetX,
+  );
+  camera.position.z = THREE.MathUtils.clamp(
+    camera.position.z,
+    bounds.min.z + insetZ,
+    bounds.max.z - insetZ,
+  );
 
   camera.lookAt(target);
   return {
@@ -404,10 +439,9 @@ export function applyInitialViewToCamera(
     initialView.target.z,
   );
   const direction = target.clone().sub(position).normalize();
-  const yaw = THREE.MathUtils.euclideanModulo(
-    Math.atan2(direction.x, -direction.z) + Math.PI,
-    Math.PI * 2,
-  ) - Math.PI;
+  const yaw =
+    THREE.MathUtils.euclideanModulo(Math.atan2(direction.x, -direction.z) + Math.PI, Math.PI * 2) -
+    Math.PI;
   const pitch = Math.asin(THREE.MathUtils.clamp(direction.y, -1, 1));
   camera.position.copy(position);
   camera.lookAt(target);
@@ -431,7 +465,11 @@ export function prepareCenteredViewFromBounds(
   const size = bounds.getSize(new THREE.Vector3());
   const eyeHeight = THREE.MathUtils.clamp(size.y * 0.1, 1.1, 1.75);
   const insetY = THREE.MathUtils.clamp(center.y, bounds.min.y + 0.95, bounds.max.y - 0.2);
-  const position = new THREE.Vector3(center.x, Math.max(insetY, bounds.min.y + eyeHeight), center.z);
+  const position = new THREE.Vector3(
+    center.x,
+    Math.max(insetY, bounds.min.y + eyeHeight),
+    center.z,
+  );
   const forwardOffset = THREE.MathUtils.clamp(Math.max(size.z * 0.18, 0.9), 0.9, 3.2);
   const target = new THREE.Vector3(center.x, position.y - 0.05, center.z - forwardOffset);
   const orientation = new THREE.Euler(0, 0, 0, "YXZ");
