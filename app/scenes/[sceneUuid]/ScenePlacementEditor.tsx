@@ -49,7 +49,6 @@ type ScenePlacementEditorProps = {
 };
 
 function formatPosition(position: { x: number; y: number; z: number }) {
-  console.log(JSON.stringify(position));
   return `${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)}`;
 }
 

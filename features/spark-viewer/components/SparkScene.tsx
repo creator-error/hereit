@@ -50,6 +50,7 @@ export function SparkScene({
   onSelectTag,
   onViewStateChange,
   soundEnabled = false,
+  onSoundEnabledChange,
   splatAssetUrl = SPARK_ASSET_URL,
   showCollisionMesh = false,
 }: SparkSceneProps) {
@@ -126,6 +127,13 @@ export function SparkScene({
   }, [showCollisionMesh]);
 
   useEffect(() => {
+    const context = audioListenerRef.current?.context;
+
+    // iOS / Chrome 対策（これがないと無音になる）
+    if (soundEnabled && context?.state === "suspended") {
+      void context.resume();
+    }
+
     for (const audio of positionalAudioRef.current) {
       if (soundEnabled) {
         if (!audio.isPlaying && audio.buffer) {
@@ -136,7 +144,6 @@ export function SparkScene({
       }
     }
   }, [soundEnabled]);
-
   const reportLoadingState = (state: ViewerLoadingState) => {
     const nextRank = state.active ? (state.mode === "progress" ? 1 : 2) : 3;
     const currentRank = loadingPhaseRankRef.current;
@@ -161,8 +168,19 @@ export function SparkScene({
     setMovementControl(key, false);
   };
 
-  const setSoundEnabled = (enabled: boolean) => {
-    soundEnabled = !!enabled;
+  const isTypingTarget = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) {
+      return false;
+    }
+
+    const tagName = target.tagName.toLowerCase();
+
+    return (
+      tagName === "input" ||
+      tagName === "textarea" ||
+      tagName === "select" ||
+      target.isContentEditable
+    );
   };
 
   useEffect(() => {
@@ -452,6 +470,10 @@ export function SparkScene({
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) {
+        return;
+      }
+
       switch (event.code) {
         case "KeyW":
         case "ArrowUp":
@@ -485,6 +507,10 @@ export function SparkScene({
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) {
+        return;
+      }
+
       switch (event.code) {
         case "KeyW":
         case "ArrowUp":
@@ -1141,7 +1167,9 @@ export function SparkScene({
         placements={placementsRef.current ?? []}
         setMovementControl={setMovementControl}
         endMovementControl={endMovementControl}
-        setSoundEnabled={setSoundEnabled}
+        setSoundEnabled={(enable) => {
+          onSoundEnabledChange?.(enable);
+        }}
       />
     </div>
   );

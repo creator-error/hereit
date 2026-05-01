@@ -11,7 +11,7 @@ type ViewerHudProps = {
   placements: SparkScenePlacement[];
   setMovementControl: (key: MovementControlKey, active: boolean) => void;
   endMovementControl: (key: MovementControlKey) => void;
-  setSoundEnabled: (enabled: boolean) => void;
+  setSoundEnabled: (enabled: boolean) => void | null;
 };
 
 export function ViewerHud({

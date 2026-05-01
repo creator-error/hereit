@@ -121,6 +121,7 @@ export type SparkSceneProps = {
   onViewStateChange?: (view: SceneInitialView) => void;
   reducedControls?: boolean;
   soundEnabled?: boolean;
+  onSoundEnabledChange?: (enabled: boolean) => void;
   splatAssetUrl?: string | null;
   showCollisionMesh?: boolean;
 };

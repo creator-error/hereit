@@ -37,17 +37,19 @@ export function ViewerTools({
       >
         <Share2 className="h-6 w-6" />
       </Button>
-      <Button
-        variant="primary"
-        size="icon"
-        title={soundEnabled ? "Disable Sound" : "Enable Sound"}
-        onClick={() => {
-          uiToggleSound(!soundEnabled);
-          setSoundEnabled(!soundEnabled);
-        }}
-      >
-        {soundEnabled ? <Megaphone className="h-6 w-6" /> : <MegaphoneOff className="h-6 w-6" />}
-      </Button>
+      {setSoundEnabled && (
+        <Button
+          variant="primary"
+          size="icon"
+          title={soundEnabled ? "Disable Sound" : "Enable Sound"}
+          onClick={() => {
+            uiToggleSound(!soundEnabled);
+            setSoundEnabled(!soundEnabled);
+          }}
+        >
+          {soundEnabled ? <Megaphone className="h-6 w-6" /> : <MegaphoneOff className="h-6 w-6" />}
+        </Button>
+      )}
       <Button
         variant="primary"
         size="icon"
