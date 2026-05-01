@@ -28,6 +28,47 @@ Scene 本体の 3D データと音源は、現在は R2 など外部ストレー
 この repo では upload 自体はまだ持たず、`scenes.room_ply_url`、`scenes.room_glb_url`、`assets.url`、`audio_files.url`
 に保存された URL をそのまま利用します。
 
+## Directory Structure
+
+- 複数ページで使う見た目の部品
+  - components/ui
+- サイト全体で使う枠
+  - components/layout
+- 特定機能に強く依存するUI
+  - features/xxx/components
+- Next.jsのルーティング・metadata・layout責務
+  - app
+- DB/API/Authなどサーバー処理
+  - server
+
+```
+app/
+  layout.tsx          // Next.jsのルートLayoutだけ
+  page.tsx            // ページの組み立てだけ
+  demo/page.tsx
+  admin/page.tsx
+components/
+  ui/                 // Button, Card, Badge, Input など汎用UI
+  layout/             // Header, Footer, AppShell など共通レイアウト
+features/
+  scenes/
+    components/       // SceneViewer, SceneCard など機能専用UI
+    hooks/
+    types.ts
+domain/
+  scene/
+    model.ts          // UIに依存しないドメイン型・ルール
+server/
+  db/
+  auth/
+  repositories/
+
+app = ルーティングと画面の組み立て
+components = 汎用UIと共通レイアウト
+features = 業務・機能単位のUI
+domain/server = UI以外
+```
+
 ## Cloudflare Workers
 
 Google OAuth と `/auth/[...nextauth]` を使うため、認証込みの運用は Cloudflare Workers

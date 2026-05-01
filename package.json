@@ -13,7 +13,9 @@
     "deploy:cf": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "db:migrate:local": "node scripts/apply-local-migrations.mjs",
-    "db:reset:local": "node scripts/reset-local-db.mjs"
+    "db:reset:local": "node scripts/reset-local-db.mjs",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.19.1",
@@ -29,11 +31,16 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@storybook/addon-a11y": "^10.3.6",
+    "@storybook/addon-docs": "^10.3.6",
+    "@storybook/nextjs-vite": "^10.3.6",
     "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.183.1",
+    "storybook": "^10.3.6",
     "typescript": "^6.0.2",
+    "vite": "^8.0.10",
     "wrangler": "^4.13.2"
   }
 }

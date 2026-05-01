@@ -2,12 +2,6 @@
 
 html,
 body {
-  min-height: 100%;
-  margin: 0;
-  padding: 0;
-}
-
-body {
   background:
     radial-gradient(circle at top, rgba(56, 189, 248, 0.2), transparent 32%),
     linear-gradient(180deg, #09111d 0%, #050813 100%);
@@ -16,6 +10,11 @@ body {
     "IBM Plex Sans",
     "Noto Sans JP",
     sans-serif;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1.5;
 }
 
 * {

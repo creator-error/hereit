@@ -30,13 +30,12 @@ type AudioPlacementBody = {
 
 export async function GET(_request: Request, context: RouteContext) {
   const session = await getAppSession();
-  const actor =
-    session?.user?.id
-      ? {
-          userId: session.user.id,
-          roles: sortRoles(session.roles ?? []),
-        }
-      : null;
+  const actor = session?.user?.id
+    ? {
+        userId: session.user.id,
+        roles: sortRoles(session.roles ?? []),
+      }
+    : null;
 
   const { sceneUuid: sceneId } = await context.params;
   const placements = await listScenePlacementsForSceneIdActor(sceneId, actor);
@@ -59,26 +58,42 @@ export async function PUT(request: Request, context: RouteContext) {
   const body = (await request.json()) as AudioPlacementBody;
   const placements = Array.isArray(body.placements) ? body.placements : [];
 
+  console.log("Received placements:", placements);
   try {
-    const saved = await replaceScenePlacementsForSceneId({
-      sceneId,
-      actorUserId: session.user.id,
-      actorRoles: sortRoles(session.roles ?? []),
-      placements: placements.map((placement) => ({
-        kind: placement.kind === "tag" ? "tag" : "audio",
-        position: {
-          x: typeof placement.position?.x === "number" ? placement.position.x : 0,
-          y: typeof placement.position?.y === "number" ? placement.position.y : 0,
-          z: typeof placement.position?.z === "number" ? placement.position.z : 0,
-        },
-        url: typeof placement.url === "string" ? placement.url : null,
-        gain: typeof placement.gain === "number" ? placement.gain : 1,
-        loop: placement.loop === true,
-        linkUrl: typeof placement.linkUrl === "string" ? placement.linkUrl : null,
-        title: typeof placement.title === "string" ? placement.title : null,
-        description: typeof placement.description === "string" ? placement.description : null,
-      })),
-    });
+    let saved = [];
+    for (const [index, placement] of placements.entries()) {
+      if (placement.kind !== "audio" && placement.kind !== "tag") {
+        throw new Error(`Invalid kind at index ${index}`);
+      }
+      if (
+        typeof placement.position?.x !== "number" ||
+        typeof placement.position?.y !== "number" ||
+        typeof placement.position?.z !== "number"
+      ) {
+        throw new Error(`Invalid position at index ${index}`);
+      }
+
+      const result = await replaceScenePlacementsForSceneId({
+        sceneId,
+        actorUserId: session.user.id,
+        actorRoles: sortRoles(session.roles ?? []),
+        placements: placements.map((placement) => ({
+          kind: placement.kind === "tag" ? "tag" : "audio",
+          position: {
+            x: typeof placement.position?.x === "number" ? placement.position.x : 0,
+            y: typeof placement.position?.y === "number" ? placement.position.y : 0,
+            z: typeof placement.position?.z === "number" ? placement.position.z : 0,
+          },
+          url: typeof placement.url === "string" ? placement.url : null,
+          gain: typeof placement.gain === "number" ? placement.gain : 1,
+          loop: placement.loop === true,
+          linkUrl: typeof placement.linkUrl === "string" ? placement.linkUrl : null,
+          title: typeof placement.title === "string" ? placement.title : null,
+          description: typeof placement.description === "string" ? placement.description : null,
+        })),
+      });
+      saved.push(result);
+    }
 
     return Response.json({ placements: saved });
   } catch (error) {

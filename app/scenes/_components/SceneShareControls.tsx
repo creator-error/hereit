@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useToast } from "@/app/_components/ToastProvider";
+import { useToast } from "@/components/layout/ToastProvider";
 
 type SceneShareControlsProps = {
   sceneId: string;
@@ -13,11 +13,7 @@ function getSceneUrl(sceneId: string) {
   return `/scenes/${sceneId}`;
 }
 
-export function SceneShareControls({
-  sceneId,
-  shared,
-  compact = false,
-}: SceneShareControlsProps) {
+export function SceneShareControls({ sceneId, shared, compact = false }: SceneShareControlsProps) {
   const scenePath = getSceneUrl(sceneId);
   const { showToast } = useToast();
 

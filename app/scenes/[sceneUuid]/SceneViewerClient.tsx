@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
-import { Button } from "@/app/_components/ui/Button";
-import { ViewerOverlayBadge, ViewerOverlayPanel } from "@/app/_components/ui/ViewerOverlay";
+import { Button } from "@/components/ui/Button";
+import { Panel } from "@/components/ui/Panel";
 import type { ViewerLoadingState } from "@/features/spark-viewer/components/SparkScene";
+import { ViewerHeader } from "@/features/spark-viewer/components/ViewerHeader";
 import type {
   SceneInitialView,
   SparkSceneCreatePoint,
@@ -13,8 +14,7 @@ import type {
 } from "@/features/spark-viewer/sceneTypes";
 
 const SparkScene = dynamic(
-  () =>
-    import("@/features/spark-viewer/components/SparkScene").then((mod) => mod.SparkScene),
+  () => import("@/features/spark-viewer/components/SparkScene").then((mod) => mod.SparkScene),
   { ssr: false },
 );
 
@@ -101,37 +101,16 @@ export function SceneViewerClient({
       </div>
       {fullscreen ? (
         <>
-          <div className="pointer-events-none absolute left-[max(20px,calc(env(safe-area-inset-left)+20px))] top-[max(20px,calc(env(safe-area-inset-top)+20px))] z-30">
-            <ViewerOverlayBadge>
-              <div className="grid h-10 w-10 place-items-center overflow-hidden rounded-[12px] border border-[rgba(212,175,55,0.3)] bg-[rgba(255,255,255,0.04)] text-[#e4c46a]">
-                {organizationLogoUrl ? (
-                  <img src={organizationLogoUrl} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <span className="text-lg leading-none">⌬</span>
-                )}
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-[0.95rem] font-medium">{sceneLabel ?? "HERE IT !"}</p>
-                <p className="truncate text-xs text-white/62">{sceneSubLabel ?? "3DGS Walkthrough"}</p>
-              </div>
-            </ViewerOverlayBadge>
-          </div>
+          <ViewerHeader
+            className="pointer-events-none absolute left-[max(20px,calc(env(safe-area-inset-left)+20px))] top-[max(20px,calc(env(safe-area-inset-top)+20px))] z-30"
+            sceneLabel={sceneLabel}
+            organizationName={sceneSubLabel}
+            organizationLogoUrl={organizationLogoUrl || "/img/logo.png"}
+          />
 
-          <div className="pointer-events-none absolute right-[max(20px,calc(env(safe-area-inset-right)+20px))] top-1/2 z-30 flex -translate-y-1/2 flex-col gap-3">
-            <Button
-              onClick={() => setSoundEnabled((current) => !current)}
-              className="pointer-events-auto"
-              aria-label={soundEnabled ? "音をオフ" : "音をオン"}
-              size="icon"
-              title={soundEnabled ? "音をオフ" : "音をオン"}
-              variant="gold-overlay"
-            >
-              {soundEnabled ? "🔊" : "🔈"}
-            </Button>
-          </div>
           {activeTag ? (
             <div className="pointer-events-none absolute right-[max(96px,calc(env(safe-area-inset-right)+96px))] top-1/2 z-30 w-[min(360px,calc(100vw-156px))] max-w-[calc(100vw-156px)] -translate-y-1/2 max-sm:right-[max(20px,calc(env(safe-area-inset-right)+20px))] max-sm:top-auto max-sm:bottom-[max(250px,calc(env(safe-area-inset-bottom)+250px))] max-sm:w-[calc(100vw-40px)] max-sm:max-w-[calc(100vw-40px)] max-sm:translate-y-0">
-              <ViewerOverlayPanel className="p-6">
+              <Panel className="p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <p className="rounded-full border border-[rgba(212,175,55,0.24)] bg-[rgba(212,175,55,0.08)] px-3 py-1 text-xs tracking-[0.16em] text-[#e4c46a]">
@@ -162,7 +141,7 @@ export function SceneViewerClient({
                     </a>
                   </div>
                 ) : null}
-              </ViewerOverlayPanel>
+              </Panel>
             </div>
           ) : null}
         </>
@@ -188,17 +167,11 @@ export function SceneViewerClient({
         </div>
         <div className="flex flex-wrap justify-end gap-3">
           {canCreatePlacement && onSaveInitialView ? (
-            <Button
-              onClick={onSaveInitialView}
-              variant="primary"
-            >
+            <Button onClick={onSaveInitialView} variant="primary">
               現在の視点を初期表示に保存
             </Button>
           ) : null}
-          <Button
-            onClick={() => setShowCollisionMesh((current) => !current)}
-            variant="secondary"
-          >
+          <Button onClick={() => setShowCollisionMesh((current) => !current)} variant="secondary">
             Collision Mesh: {showCollisionMesh ? "ON" : "OFF"}
           </Button>
         </div>

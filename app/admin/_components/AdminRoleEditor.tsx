@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useToast } from "@/app/_components/ToastProvider";
+import { useToast } from "@/components/layout/ToastProvider";
 import {
   ROLE_LABELS,
   ROLE_ORDER,
@@ -209,7 +209,10 @@ export function AdminRoleEditor({
         "success",
       );
     } catch (caughtError) {
-      showToast(caughtError instanceof Error ? caughtError.message : "不明なエラーが発生しました", "error");
+      showToast(
+        caughtError instanceof Error ? caughtError.message : "不明なエラーが発生しました",
+        "error",
+      );
     } finally {
       setSavingUserId(null);
     }

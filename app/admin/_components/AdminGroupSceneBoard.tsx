@@ -8,8 +8,8 @@ import {
   deleteSceneAction,
   toggleSceneSharedAction,
 } from "@/app/admin/actions";
-import { useToast } from "@/app/_components/ToastProvider";
-import { Button } from "@/app/_components/ui/Button";
+import { useToast } from "@/components/layout/ToastProvider";
+import { Button } from "@/components/ui/Button";
 import type { AppOrganizationSummary } from "@/server/repositories/user-repository";
 
 type AdminOrganizationSceneBoardProps = {
@@ -118,10 +118,7 @@ export function AdminOrganizationSceneBoard({
                   会社名や部門名の単位でシーンをまとめる組織を作成します。
                 </p>
               </div>
-              <Button
-                onClick={() => setCreateModalOpen(false)}
-                variant="secondary"
-              >
+              <Button onClick={() => setCreateModalOpen(false)} variant="secondary">
                 閉じる
               </Button>
             </div>
@@ -147,7 +144,9 @@ export function AdminOrganizationSceneBoard({
                 />
               </div>
               <div>
-                <label className="text-xs uppercase tracking-[0.18em] text-white/44">ロゴ URL</label>
+                <label className="text-xs uppercase tracking-[0.18em] text-white/44">
+                  ロゴ URL
+                </label>
                 <input
                   type="url"
                   name="logoUrl"
@@ -156,18 +155,10 @@ export function AdminOrganizationSceneBoard({
                 />
               </div>
               <div className="flex flex-wrap justify-end gap-3">
-                <Button
-                  onClick={() => setCreateModalOpen(false)}
-                  size="md"
-                  variant="secondary"
-                >
+                <Button onClick={() => setCreateModalOpen(false)} size="md" variant="secondary">
                   キャンセル
                 </Button>
-                <Button
-                  type="submit"
-                  size="md"
-                  variant="primary"
-                >
+                <Button type="submit" size="md" variant="primary">
                   組織を作成
                 </Button>
               </div>
@@ -251,7 +242,10 @@ export function AdminOrganizationSceneBoard({
                           </p>
                         ) : null}
                       </div>
-                      <div className="relative flex items-center gap-2" ref={openSceneMenuId === scene.id ? sceneMenuRef : null}>
+                      <div
+                        className="relative flex items-center gap-2"
+                        ref={openSceneMenuId === scene.id ? sceneMenuRef : null}
+                      >
                         <span
                           className={`rounded-full border px-3 py-1 text-xs ${sceneStatusTone(scene.shared)}`}
                         >
@@ -260,7 +254,9 @@ export function AdminOrganizationSceneBoard({
                         <button
                           type="button"
                           onClick={() =>
-                            setOpenSceneMenuId((current) => (current === scene.id ? null : scene.id))
+                            setOpenSceneMenuId((current) =>
+                              current === scene.id ? null : scene.id,
+                            )
                           }
                           className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/12 bg-white/6 text-sm text-white transition hover:bg-white/10"
                           aria-label="シーンメニューを開く"

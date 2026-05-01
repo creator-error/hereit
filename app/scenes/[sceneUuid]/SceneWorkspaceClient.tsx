@@ -8,7 +8,7 @@ import {
   type EditableScenePlacementDraft,
 } from "./ScenePlacementEditor";
 import { SceneViewerClient } from "./SceneViewerClient";
-import { useToast } from "@/app/_components/ToastProvider";
+import { useToast } from "@/components/layout/ToastProvider";
 import type { SceneInitialView, SparkScenePlacement } from "@/features/spark-viewer/sceneTypes";
 import type { AppScenePlacement } from "@/server/repositories/user-repository";
 
@@ -236,7 +236,7 @@ export function SceneWorkspaceClient({
       setSelectedPlacementId((current) =>
         nextPlacements.some((placement) => placement.id === current)
           ? current
-          : nextPlacements[0]?.id ?? null,
+          : (nextPlacements[0]?.id ?? null),
       );
       showToast("配置設定を保存しました。", "success");
     } catch (error) {
@@ -294,7 +294,9 @@ export function SceneWorkspaceClient({
         canEdit={canEdit}
         editorState={editorState}
         onCancelEditor={() => setEditorState(null)}
-        onChangeDraft={(draft) => setEditorState((current) => (current ? { ...current, draft } : current))}
+        onChangeDraft={(draft) =>
+          setEditorState((current) => (current ? { ...current, draft } : current))
+        }
         onDeletePlacement={handleDeletePlacement}
         onEditPlacement={handleEditPlacement}
         onSave={handleSave}

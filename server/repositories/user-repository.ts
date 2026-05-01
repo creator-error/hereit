@@ -1,4 +1,4 @@
-import { normalizeRole, sortRoles } from "@/features/admin/roles";
+import { getPrimaryRole, normalizeRole, sortRoles } from "@/features/admin/roles";
 import { getRuntimeDatabase } from "@/server/db/runtime";
 import { validateAssetInput } from "@/server/uploads/validation";
 
@@ -24,7 +24,6 @@ export type AppUser = {
 export type AppUserOrganizationMembership = {
   organizationId: string;
   organizationName: string;
-  role: string;
 };
 
 export type AppUserDirectoryEntry = AppUser & {
@@ -35,28 +34,32 @@ export type AppSceneSummary = {
   id: string;
   organizationId: string;
   organizationName?: string;
+  organizationLogoUrl?: string | null;
   name: string;
   description: string | null;
   shared: boolean;
   roomPlyUrl: string | null;
   roomGlbUrl: string | null;
+  initialView: {
+    position: {
+      x: number;
+      y: number;
+      z: number;
+    };
+    target: {
+      x: number;
+      y: number;
+      z: number;
+    };
+  } | null;
 };
 
-export type AppAudioPlacement = {
+export type AppSceneAudioPlacement = {
   id: string;
   sceneId: string;
-  audioFileId: string;
-  name: string | null;
+  kind: "audio";
   url: string;
-  originalFilename: string | null;
-  mimeType: string | null;
-  byteSize: number | null;
   position: {
-    x: number;
-    y: number;
-    z: number;
-  };
-  rotation: {
     x: number;
     y: number;
     z: number;
@@ -65,10 +68,27 @@ export type AppAudioPlacement = {
   loop: boolean;
 };
 
+export type AppSceneTag = {
+  id: string;
+  sceneId: string;
+  kind: "tag";
+  title: string;
+  description: string;
+  linkUrl: string | null;
+  position: {
+    x: number;
+    y: number;
+    z: number;
+  };
+};
+
+export type AppScenePlacement = AppSceneAudioPlacement | AppSceneTag;
+
 export type AppOrganizationSummary = {
   id: string;
   name: string;
   description: string | null;
+  logoUrl: string | null;
   membersCount: number;
   removable: boolean;
   scenes: AppSceneSummary[];
@@ -93,6 +113,7 @@ export type OrganizationCatalogEntry = {
   id: string;
   name: string;
   description: string | null;
+  logoUrl: string | null;
 };
 
 type UpsertGoogleUserInput = {
@@ -155,6 +176,7 @@ const createOrganizationsTableSql = `
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
+    logo_url TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   )
@@ -181,6 +203,12 @@ const createScenesTableSql = `
     shared INTEGER NOT NULL DEFAULT 0,
     room_ply_url TEXT,
     room_glb_url TEXT,
+    initial_camera_x REAL,
+    initial_camera_y REAL,
+    initial_camera_z REAL,
+    initial_target_x REAL,
+    initial_target_y REAL,
+    initial_target_z REAL,
     created_by_user_id TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
@@ -216,54 +244,50 @@ const createAssetsSceneKindIndexSql = `
   ON assets (scene_id, kind)
 `;
 
-const createAudioFilesTableSql = `
-  CREATE TABLE IF NOT EXISTS audio_files (
+const createSceneAudioPlacementsTableSql = `
+  CREATE TABLE IF NOT EXISTS scene_audio_placements (
     id TEXT PRIMARY KEY,
     scene_id TEXT NOT NULL,
     url TEXT NOT NULL,
-    original_filename TEXT,
-    mime_type TEXT,
-    byte_size INTEGER,
-    created_by_user_id TEXT,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE,
-    FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-  )
-`;
-
-const createAudioFilesSceneIndexSql = `
-  CREATE INDEX IF NOT EXISTS audio_files_scene_idx
-  ON audio_files (scene_id)
-`;
-
-const createAudioPlacementsTableSql = `
-  CREATE TABLE IF NOT EXISTS audio_placements (
-    id TEXT PRIMARY KEY,
-    scene_id TEXT NOT NULL,
-    audio_file_id TEXT NOT NULL,
-    name TEXT,
     position_x REAL NOT NULL,
     position_y REAL NOT NULL,
     position_z REAL NOT NULL,
-    rotation_x REAL NOT NULL DEFAULT 0,
-    rotation_y REAL NOT NULL DEFAULT 0,
-    rotation_z REAL NOT NULL DEFAULT 0,
     gain REAL NOT NULL DEFAULT 1,
     loop_enabled INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE,
-    FOREIGN KEY (audio_file_id) REFERENCES audio_files(id) ON DELETE CASCADE
+    FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
   )
 `;
 
-const createAudioPlacementsSceneIndexSql = `
-  CREATE INDEX IF NOT EXISTS audio_placements_scene_idx
-  ON audio_placements (scene_id)
+const createSceneAudioPlacementsSceneIndexSql = `
+  CREATE INDEX IF NOT EXISTS scene_audio_placements_scene_idx
+  ON scene_audio_placements (scene_id)
+`;
+
+const createSceneTagsTableSql = `
+  CREATE TABLE IF NOT EXISTS scene_tags (
+    id TEXT PRIMARY KEY,
+    scene_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    link_url TEXT,
+    position_x REAL NOT NULL,
+    position_y REAL NOT NULL,
+    position_z REAL NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
+  )
+`;
+
+const createSceneTagsSceneIndexSql = `
+  CREATE INDEX IF NOT EXISTS scene_tags_scene_idx
+  ON scene_tags (scene_id)
 `;
 
 type UserRoleRow = {
+  user_id?: string;
   role: string;
 };
 
@@ -279,44 +303,81 @@ type OrganizationMembershipRow = {
   user_id: string;
   organization_id: string;
   organization_name: string;
-  role: string | null;
 };
 
-type AudioPlacementRow = {
+type SceneAudioPlacementRow = {
   id: string;
   scene_id: string;
-  audio_file_id: string;
-  name: string | null;
   url: string;
-  original_filename: string | null;
-  mime_type: string | null;
-  byte_size: number | null;
   position_x: number;
   position_y: number;
   position_z: number;
-  rotation_x: number;
-  rotation_y: number;
-  rotation_z: number;
   gain: number;
   loop_enabled: number;
+};
+
+type SceneTagRow = {
+  id: string;
+  scene_id: string;
+  title: string;
+  description: string;
+  link_url: string | null;
+  position_x: number;
+  position_y: number;
+  position_z: number;
 };
 
 type OrganizationSummaryRow = {
   id: string;
   name: string;
   description: string | null;
+  logo_url: string | null;
   members_count: number;
 };
 
 type SceneSummaryRow = {
   id: string;
   organization_id: string;
+  organization_name?: string;
+  organization_logo_url?: string | null;
   name: string;
   description: string | null;
   shared: number;
   room_ply_url: string | null;
   room_glb_url: string | null;
+  initial_camera_x: number | null;
+  initial_camera_y: number | null;
+  initial_camera_z: number | null;
+  initial_target_x: number | null;
+  initial_target_y: number | null;
+  initial_target_z: number | null;
 };
+
+function mapSceneInitialView(row: SceneSummaryRow) {
+  if (
+    row.initial_camera_x === null ||
+    row.initial_camera_y === null ||
+    row.initial_camera_z === null ||
+    row.initial_target_x === null ||
+    row.initial_target_y === null ||
+    row.initial_target_z === null
+  ) {
+    return null;
+  }
+
+  return {
+    position: {
+      x: row.initial_camera_x,
+      y: row.initial_camera_y,
+      z: row.initial_camera_z,
+    },
+    target: {
+      x: row.initial_target_x,
+      y: row.initial_target_y,
+      z: row.initial_target_z,
+    },
+  };
+}
 
 function normalizeUser(row: UserRow, roles: string[]): AppUser {
   return {
@@ -354,14 +415,24 @@ async function ensureAuthSchema() {
   await db.exec(createScenesOrganizationIndexSql);
   await db.exec(createAssetsTableSql);
   await db.exec(createAssetsSceneKindIndexSql);
-  await db.exec(createAudioFilesTableSql);
-  await db.exec(createAudioFilesSceneIndexSql);
-  await db.exec(createAudioPlacementsTableSql);
-  await db.exec(createAudioPlacementsSceneIndexSql);
+  await db.exec(createSceneAudioPlacementsTableSql);
+  await db.exec(createSceneAudioPlacementsSceneIndexSql);
+  await db.exec(createSceneTagsTableSql);
+  await db.exec(createSceneTagsSceneIndexSql);
   await ensureColumnExists("organization_memberships", "role", "TEXT NOT NULL DEFAULT 'viewer'");
   await ensureColumnExists("scenes", "shared", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumnExists("scenes", "initial_camera_x", "REAL");
+  await ensureColumnExists("scenes", "initial_camera_y", "REAL");
+  await ensureColumnExists("scenes", "initial_camera_z", "REAL");
+  await ensureColumnExists("scenes", "initial_target_x", "REAL");
+  await ensureColumnExists("scenes", "initial_target_y", "REAL");
+  await ensureColumnExists("scenes", "initial_target_z", "REAL");
+  await ensureColumnExists("organizations", "logo_url", "TEXT");
+  await ensureColumnExists("scene_tags", "title", "TEXT NOT NULL DEFAULT ''");
+  await ensureColumnExists("scene_tags", "link_url", "TEXT");
   await db.run("UPDATE organization_memberships SET role = 'viewer' WHERE role IS NULL");
   await db.run("UPDATE scenes SET shared = 0 WHERE shared IS NULL");
+  await normalizeLegacyUserRoles();
 
   return db;
 }
@@ -369,7 +440,9 @@ async function ensureAuthSchema() {
 function createShortId(length = DEFAULT_SHORT_ID_LENGTH): string {
   const randomBytes = crypto.getRandomValues(new Uint8Array(length));
 
-  return Array.from(randomBytes, (byte) => SHORT_ID_ALPHABET[byte % SHORT_ID_ALPHABET.length]).join("");
+  return Array.from(randomBytes, (byte) => SHORT_ID_ALPHABET[byte % SHORT_ID_ALPHABET.length]).join(
+    "",
+  );
 }
 
 async function generateUniqueShortId(
@@ -427,9 +500,8 @@ async function findExistingUser(
 ): Promise<UserRow | null> {
   const db = await ensureAuthSchema();
 
-  const existingUser = await db
-    .first<UserRow>(
-      `
+  const existingUser = await db.first<UserRow>(
+    `
         SELECT u.id, u.email, u.display_name, u.avatar_url, u.created_at, u.updated_at
         FROM users u
         LEFT JOIN auth_identities ai
@@ -438,8 +510,8 @@ async function findExistingUser(
           OR lower(u.email) = lower(?)
         LIMIT 1
       `,
-      [provider, googleSub, email],
-    );
+    [provider, googleSub, email],
+  );
 
   return existingUser;
 }
@@ -457,6 +529,63 @@ async function listUserRoles(userId: string): Promise<string[]> {
   );
 
   return sortRoles(rows.map((row) => normalizeRole(row.role)));
+}
+
+async function syncOrganizationMembershipRolesForUser(userId: string, roles: string[]) {
+  const primaryRole = getPrimaryRole(roles) ?? "viewer";
+  const db = await ensureAuthSchema();
+  await db.run("UPDATE organization_memberships SET role = ? WHERE user_id = ?", [
+    primaryRole,
+    userId,
+  ]);
+}
+
+async function normalizeLegacyUserRoles() {
+  const db = await getRuntimeDatabase();
+  const rows = await db.all<UserRoleRow>(
+    `
+      SELECT user_id, role
+      FROM user_roles
+      ORDER BY user_id ASC, role ASC
+    `,
+  );
+  const rolesByUserId = new Map<string, string[]>();
+
+  for (const row of rows) {
+    if (!row.user_id) {
+      continue;
+    }
+
+    const current = rolesByUserId.get(row.user_id) ?? [];
+    current.push(row.role);
+    rolesByUserId.set(row.user_id, current);
+  }
+
+  for (const [userId, roles] of rolesByUserId) {
+    const primaryRole = getPrimaryRole(roles);
+
+    if (!primaryRole) {
+      continue;
+    }
+
+    const normalizedRoles = sortRoles(roles);
+
+    if (normalizedRoles.length > 1 || normalizedRoles[0] !== primaryRole) {
+      await db.run("DELETE FROM user_roles WHERE user_id = ?", [userId]);
+      await db.run(
+        `
+          INSERT INTO user_roles (user_id, role, created_at)
+          VALUES (?, ?, ?)
+        `,
+        [userId, primaryRole, new Date().toISOString()],
+      );
+    }
+
+    await db.run("UPDATE organization_memberships SET role = ? WHERE user_id = ?", [
+      primaryRole,
+      userId,
+    ]);
+  }
 }
 
 export async function listUsersWithRoles(): Promise<AppUser[]> {
@@ -509,8 +638,7 @@ export async function listUsersWithMemberships(): Promise<AppUserDirectoryEntry[
           SELECT
             gm.user_id,
             gm.organization_id,
-            g.name AS organization_name,
-            gm.role
+            g.name AS organization_name
           FROM organization_memberships gm
           INNER JOIN organizations g
             ON g.id = gm.organization_id
@@ -527,7 +655,6 @@ export async function listUsersWithMemberships(): Promise<AppUserDirectoryEntry[
     current.push({
       organizationId: row.organization_id,
       organizationName: row.organization_name,
-      role: normalizeRole(row.role ?? "viewer"),
     });
     membershipsByUserId.set(row.user_id, current);
   }
@@ -585,7 +712,12 @@ export async function replaceUserRoles(userId: string, roles: string[]): Promise
     return null;
   }
 
-  const normalizedRoles = sortRoles(roles.map((role) => normalizeRole(role.trim())).filter(Boolean));
+  const normalizedRoles = (() => {
+    const primaryRole = getPrimaryRole(
+      roles.map((role) => normalizeRole(role.trim())).filter(Boolean),
+    );
+    return primaryRole ? [primaryRole] : [];
+  })();
   const now = new Date().toISOString();
 
   await db.run("DELETE FROM user_roles WHERE user_id = ?", [userId]);
@@ -600,6 +732,8 @@ export async function replaceUserRoles(userId: string, roles: string[]): Promise
     );
   }
 
+  await syncOrganizationMembershipRolesForUser(userId, normalizedRoles);
+
   return normalizeUser(user, normalizedRoles);
 }
 
@@ -610,20 +744,19 @@ export async function listOrganizationsWithScenesForUser(input: {
   const db = await ensureAuthSchema();
   const actorRoles = sortRoles(input.roles);
 
-  const visibleOrganizationIds =
-    actorRoles.includes("admin")
-      ? null
-      : (
-          await db.all<{ organization_id: string }>(
-            `
+  const visibleOrganizationIds = actorRoles.includes("admin")
+    ? null
+    : (
+        await db.all<{ organization_id: string }>(
+          `
               SELECT organization_id
               FROM organization_memberships
               WHERE user_id = ?
               ORDER BY organization_id ASC
             `,
-            [input.userId],
-          )
-        ).map((row) => row.organization_id);
+          [input.userId],
+        )
+      ).map((row) => row.organization_id);
 
   if (visibleOrganizationIds && visibleOrganizationIds.length === 0) {
     return [];
@@ -638,12 +771,13 @@ export async function listOrganizationsWithScenesForUser(input: {
         g.id,
         g.name,
         g.description,
+        g.logo_url,
         COUNT(DISTINCT gm.user_id) AS members_count
       FROM organizations g
       LEFT JOIN organization_memberships gm
         ON gm.organization_id = g.id
       ${groupFilterSql}
-      GROUP BY g.id, g.name, g.description
+      GROUP BY g.id, g.name, g.description, g.logo_url
       ORDER BY g.name ASC
     `,
     visibleOrganizationIds ?? [],
@@ -661,7 +795,13 @@ export async function listOrganizationsWithScenesForUser(input: {
         s.description,
         s.shared,
         s.room_ply_url,
-        s.room_glb_url
+        s.room_glb_url,
+        s.initial_camera_x,
+        s.initial_camera_y,
+        s.initial_camera_z,
+        s.initial_target_x,
+        s.initial_target_y,
+        s.initial_target_z
       FROM scenes s
       ${sceneFilterSql}
       ORDER BY s.name ASC
@@ -681,6 +821,7 @@ export async function listOrganizationsWithScenesForUser(input: {
       shared: row.shared === 1,
       roomPlyUrl: row.room_ply_url,
       roomGlbUrl: row.room_glb_url,
+      initialView: mapSceneInitialView(row),
     });
     scenesByOrganizationId.set(row.organization_id, current);
   }
@@ -691,6 +832,7 @@ export async function listOrganizationsWithScenesForUser(input: {
       id: row.id,
       name: row.name,
       description: row.description,
+      logoUrl: row.logo_url,
       membersCount: row.members_count,
       removable: row.members_count === 0 && scenes.length === 0,
       scenes,
@@ -698,7 +840,9 @@ export async function listOrganizationsWithScenesForUser(input: {
   });
 }
 
-async function listAccessibleOrganizationIdsForActor(actor: SceneAccessActor): Promise<string[] | null> {
+async function listAccessibleOrganizationIdsForActor(
+  actor: SceneAccessActor,
+): Promise<string[] | null> {
   if (!actor) {
     return [];
   }
@@ -723,22 +867,31 @@ async function listAccessibleOrganizationIdsForActor(actor: SceneAccessActor): P
   return rows.map((row) => row.organization_id);
 }
 
-export async function listVisibleScenesForActor(actor: SceneAccessActor): Promise<AppSceneSummary[]> {
+export async function listVisibleScenesForActor(
+  actor: SceneAccessActor,
+): Promise<AppSceneSummary[]> {
   const db = await ensureAuthSchema();
   const accessibleOrganizationIds = await listAccessibleOrganizationIdsForActor(actor);
 
   if (accessibleOrganizationIds && accessibleOrganizationIds.length === 0) {
-    const publicRows = await db.all<(SceneSummaryRow & { organization_name: string })>(
+    const publicRows = await db.all<SceneSummaryRow & { organization_name: string }>(
       `
         SELECT
           s.id,
           s.organization_id,
           g.name AS organization_name,
+          g.logo_url AS organization_logo_url,
           s.name,
           s.description,
           s.shared,
           s.room_ply_url,
-          s.room_glb_url
+          s.room_glb_url,
+          s.initial_camera_x,
+          s.initial_camera_y,
+          s.initial_camera_z,
+          s.initial_target_x,
+          s.initial_target_y,
+          s.initial_target_z
         FROM scenes s
         INNER JOIN organizations g
           ON g.id = s.organization_id
@@ -751,11 +904,13 @@ export async function listVisibleScenesForActor(actor: SceneAccessActor): Promis
       id: row.id,
       organizationId: row.organization_id,
       organizationName: row.organization_name,
+      organizationLogoUrl: row.organization_logo_url,
       name: row.name,
       description: row.description,
       shared: row.shared === 1,
       roomPlyUrl: row.room_ply_url,
       roomGlbUrl: row.room_glb_url,
+      initialView: mapSceneInitialView(row),
     }));
   }
 
@@ -764,17 +919,24 @@ export async function listVisibleScenesForActor(actor: SceneAccessActor): Promis
       ? ""
       : `WHERE s.shared = 1 OR s.organization_id IN (${accessibleOrganizationIds.map(() => "?").join(", ")})`;
 
-  const rows = await db.all<(SceneSummaryRow & { organization_name: string })>(
+  const rows = await db.all<SceneSummaryRow & { organization_name: string }>(
     `
       SELECT
         s.id,
         s.organization_id,
         g.name AS organization_name,
+        g.logo_url AS organization_logo_url,
         s.name,
         s.description,
         s.shared,
         s.room_ply_url,
-        s.room_glb_url
+        s.room_glb_url,
+        s.initial_camera_x,
+        s.initial_camera_y,
+        s.initial_camera_z,
+        s.initial_target_x,
+        s.initial_target_y,
+        s.initial_target_z
       FROM scenes s
       INNER JOIN organizations g
         ON g.id = s.organization_id
@@ -788,11 +950,13 @@ export async function listVisibleScenesForActor(actor: SceneAccessActor): Promis
     id: row.id,
     organizationId: row.organization_id,
     organizationName: row.organization_name,
+    organizationLogoUrl: row.organization_logo_url,
     name: row.name,
     description: row.description,
     shared: row.shared === 1,
     roomPlyUrl: row.room_ply_url,
     roomGlbUrl: row.room_glb_url,
+    initialView: mapSceneInitialView(row),
   }));
 }
 
@@ -804,17 +968,24 @@ export async function getVisibleSceneByIdForActor(
   const accessibleOrganizationIds = await listAccessibleOrganizationIdsForActor(actor);
 
   if (accessibleOrganizationIds && accessibleOrganizationIds.length === 0) {
-    const row = await db.first<(SceneSummaryRow & { organization_name: string })>(
+    const row = await db.first<SceneSummaryRow & { organization_name: string }>(
       `
         SELECT
           s.id,
           s.organization_id,
           g.name AS organization_name,
+          g.logo_url AS organization_logo_url,
           s.name,
           s.description,
           s.shared,
           s.room_ply_url,
-          s.room_glb_url
+          s.room_glb_url,
+          s.initial_camera_x,
+          s.initial_camera_y,
+          s.initial_camera_z,
+          s.initial_target_x,
+          s.initial_target_y,
+          s.initial_target_z
         FROM scenes s
         INNER JOIN organizations g
           ON g.id = s.organization_id
@@ -833,11 +1004,13 @@ export async function getVisibleSceneByIdForActor(
       id: row.id,
       organizationId: row.organization_id,
       organizationName: row.organization_name,
+      organizationLogoUrl: row.organization_logo_url,
       name: row.name,
       description: row.description,
       shared: row.shared === 1,
       roomPlyUrl: row.room_ply_url,
       roomGlbUrl: row.room_glb_url,
+      initialView: mapSceneInitialView(row),
     };
   }
 
@@ -845,18 +1018,26 @@ export async function getVisibleSceneByIdForActor(
     accessibleOrganizationIds === null
       ? "WHERE s.id = ?"
       : `WHERE s.id = ? AND (s.shared = 1 OR s.organization_id IN (${accessibleOrganizationIds.map(() => "?").join(", ")}))`;
-  const params = accessibleOrganizationIds === null ? [sceneId] : [sceneId, ...accessibleOrganizationIds];
-  const row = await db.first<(SceneSummaryRow & { organization_name: string })>(
+  const params =
+    accessibleOrganizationIds === null ? [sceneId] : [sceneId, ...accessibleOrganizationIds];
+  const row = await db.first<SceneSummaryRow & { organization_name: string }>(
     `
       SELECT
         s.id,
         s.organization_id,
         g.name AS organization_name,
+        g.logo_url AS organization_logo_url,
         s.name,
         s.description,
         s.shared,
         s.room_ply_url,
-        s.room_glb_url
+        s.room_glb_url,
+        s.initial_camera_x,
+        s.initial_camera_y,
+        s.initial_camera_z,
+        s.initial_target_x,
+        s.initial_target_y,
+        s.initial_target_z
       FROM scenes s
       INNER JOIN organizations g
         ON g.id = s.organization_id
@@ -874,11 +1055,13 @@ export async function getVisibleSceneByIdForActor(
     id: row.id,
     organizationId: row.organization_id,
     organizationName: row.organization_name,
+    organizationLogoUrl: row.organization_logo_url,
     name: row.name,
     description: row.description,
     shared: row.shared === 1,
     roomPlyUrl: row.room_ply_url,
     roomGlbUrl: row.room_glb_url,
+    initialView: mapSceneInitialView(row),
   };
 }
 
@@ -907,35 +1090,42 @@ export async function getSceneAccessHintById(sceneId: string): Promise<SceneAcce
   };
 }
 
-function mapAudioPlacementRow(row: AudioPlacementRow): AppAudioPlacement {
+function mapSceneAudioPlacementRow(row: SceneAudioPlacementRow): AppSceneAudioPlacement {
   return {
     id: row.id,
     sceneId: row.scene_id,
-    audioFileId: row.audio_file_id,
-    name: row.name,
+    kind: "audio",
     url: row.url,
-    originalFilename: row.original_filename,
-    mimeType: row.mime_type,
-    byteSize: row.byte_size,
     position: {
       x: row.position_x,
       y: row.position_y,
       z: row.position_z,
-    },
-    rotation: {
-      x: row.rotation_x,
-      y: row.rotation_y,
-      z: row.rotation_z,
     },
     gain: row.gain,
     loop: row.loop_enabled === 1,
   };
 }
 
-export async function listAudioPlacementsForSceneIdActor(
+function mapSceneTagRow(row: SceneTagRow): AppSceneTag {
+  return {
+    id: row.id,
+    sceneId: row.scene_id,
+    kind: "tag",
+    title: row.title,
+    description: row.description,
+    linkUrl: row.link_url,
+    position: {
+      x: row.position_x,
+      y: row.position_y,
+      z: row.position_z,
+    },
+  };
+}
+
+export async function listScenePlacementsForSceneIdActor(
   sceneId: string,
   actor: SceneAccessActor,
-): Promise<AppAudioPlacement[] | null> {
+): Promise<AppScenePlacement[] | null> {
   const scene = await getVisibleSceneByIdForActor(sceneId, actor);
 
   if (!scene) {
@@ -943,61 +1133,65 @@ export async function listAudioPlacementsForSceneIdActor(
   }
 
   const db = await ensureAuthSchema();
-  const rows = await db.all<AudioPlacementRow>(
+  const audioRows = await db.all<SceneAudioPlacementRow>(
     `
       SELECT
-        ap.id,
-        ap.scene_id,
-        ap.audio_file_id,
-        ap.name,
-        af.url,
-        af.original_filename,
-        af.mime_type,
-        af.byte_size,
-        ap.position_x,
-        ap.position_y,
-        ap.position_z,
-        ap.rotation_x,
-        ap.rotation_y,
-        ap.rotation_z,
-        ap.gain,
-        ap.loop_enabled
-      FROM audio_placements ap
-      INNER JOIN audio_files af
-        ON af.id = ap.audio_file_id
-      WHERE ap.scene_id = ?
-      ORDER BY COALESCE(ap.name, af.original_filename, af.url) ASC, ap.id ASC
+        id,
+        scene_id,
+        url,
+        position_x,
+        position_y,
+        position_z,
+        gain,
+        loop_enabled
+      FROM scene_audio_placements
+      WHERE scene_id = ?
+      ORDER BY id ASC
+    `,
+    [scene.id],
+  );
+  const tagRows = await db.all<SceneTagRow>(
+    `
+      SELECT
+        id,
+        scene_id,
+        title,
+        description,
+        link_url,
+        position_x,
+        position_y,
+        position_z
+      FROM scene_tags
+      WHERE scene_id = ?
+      ORDER BY id ASC
     `,
     [scene.id],
   );
 
-  return rows.map(mapAudioPlacementRow);
+  return [...audioRows.map(mapSceneAudioPlacementRow), ...tagRows.map(mapSceneTagRow)].sort(
+    (left, right) => left.id.localeCompare(right.id),
+  );
 }
 
-export async function replaceAudioPlacementsForSceneId(input: {
+export async function replaceScenePlacementsForSceneId(input: {
   sceneId: string;
   actorUserId: string;
   actorRoles: string[];
   placements: Array<{
-    name: string | null;
-    url: string;
-    originalFilename: string | null;
-    mimeType: string | null;
-    byteSize: number | null;
+    kind: "audio" | "tag";
     position: {
       x: number;
       y: number;
       z: number;
     };
-    rotation: {
-      x: number;
-      y: number;
-      z: number;
-    };
-    gain: number;
-    loop: boolean;
+    url?: string | null;
+    gain?: number;
+    loop?: boolean;
+    title?: string | null;
+    description?: string | null;
+    linkUrl?: string | null;
   }>;
-}): Promise<AppAudioPlacement[]> {
+}): Promise<AppScenePlacement[]> {
   const db = await ensureAuthSchema();
   const scene = await db.first<{ id: string; organization_id: string }>(
     `
@@ -1026,161 +1220,119 @@ export async function replaceAudioPlacementsForSceneId(input: {
   const now = new Date().toISOString();
   const normalizedPlacements = input.placements
     .map((placement) => ({
-      name: placement.name?.trim() || null,
-      url: placement.url.trim(),
-      originalFilename: placement.originalFilename?.trim() || null,
-      mimeType: placement.mimeType?.trim() || null,
-      byteSize:
-        typeof placement.byteSize === "number" && Number.isFinite(placement.byteSize)
-          ? Math.max(0, Math.round(placement.byteSize))
-          : null,
+      kind: placement.kind,
       position: {
         x: Number(placement.position.x),
         y: Number(placement.position.y),
         z: Number(placement.position.z),
       },
-      rotation: {
-        x: Number(placement.rotation.x),
-        y: Number(placement.rotation.y),
-        z: Number(placement.rotation.z),
-      },
-      gain: Number(placement.gain),
-      loop: placement.loop,
+      url: typeof placement.url === "string" ? placement.url.trim() : "",
+      gain: typeof placement.gain === "number" ? Number(placement.gain) : 1,
+      loop: placement.loop === true,
+      linkUrl: typeof placement.linkUrl === "string" ? placement.linkUrl.trim() : "",
+      title: typeof placement.title === "string" ? placement.title.trim() : "",
+      description: typeof placement.description === "string" ? placement.description.trim() : "",
     }))
-    .filter((placement) => placement.url.length > 0)
     .filter(
       (placement) =>
+        (placement.kind === "audio" || placement.kind === "tag") &&
         Number.isFinite(placement.position.x) &&
         Number.isFinite(placement.position.y) &&
-        Number.isFinite(placement.position.z) &&
-        Number.isFinite(placement.rotation.x) &&
-        Number.isFinite(placement.rotation.y) &&
-        Number.isFinite(placement.rotation.z) &&
-        Number.isFinite(placement.gain),
+        Number.isFinite(placement.position.z),
+    )
+    .filter((placement) =>
+      placement.kind === "audio"
+        ? placement.url.length > 0 && Number.isFinite(placement.gain)
+        : placement.title.length > 0 && placement.description.length > 0,
     );
 
   for (const placement of normalizedPlacements) {
+    if (placement.kind !== "audio") {
+      continue;
+    }
+
     validateAssetInput({
       kind: "audio",
       urlOrFilename: placement.url,
-      mimeType: placement.mimeType,
-      byteSize: placement.byteSize,
+      mimeType: null,
+      byteSize: null,
     });
   }
 
-  await db.run("DELETE FROM audio_placements WHERE scene_id = ?", [scene.id]);
-  await db.run("DELETE FROM audio_files WHERE scene_id = ?", [scene.id]);
-
-  const fileIdsByKey = new Map<string, string>();
+  await db.run("DELETE FROM scene_audio_placements WHERE scene_id = ?", [scene.id]);
+  await db.run("DELETE FROM scene_tags WHERE scene_id = ?", [scene.id]);
 
   for (const placement of normalizedPlacements) {
-    const fileKey = [
-      placement.url,
-      placement.originalFilename ?? "",
-      placement.mimeType ?? "",
-      placement.byteSize ?? "",
-    ].join("::");
-
-    let audioFileId = fileIdsByKey.get(fileKey);
-
-    if (!audioFileId) {
-      audioFileId = crypto.randomUUID();
-      fileIdsByKey.set(fileKey, audioFileId);
+    if (placement.kind === "audio") {
+      console.log("Inserting audio placement", placement, scene.id);
       await db.run(
         `
-          INSERT INTO audio_files (
+          INSERT INTO scene_audio_placements (
             id,
             scene_id,
             url,
-            original_filename,
-            mime_type,
-            byte_size,
-            created_by_user_id,
+            position_x,
+            position_y,
+            position_z,
+            gain,
+            loop_enabled,
             created_at,
             updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         [
-          audioFileId,
+          crypto.randomUUID(),
           scene.id,
           placement.url,
-          placement.originalFilename,
-          placement.mimeType,
-          placement.byteSize,
-          input.actorUserId,
+          placement.position.x,
+          placement.position.y,
+          placement.position.z,
+          placement.gain,
+          placement.loop ? 1 : 0,
+          now,
+          now,
+        ],
+      );
+      continue;
+    } else if (placement.kind === "tag") {
+      console.log("Inserting tag placement", placement, scene.id);
+      await db.run(
+        `
+        INSERT INTO scene_tags (
+          id,
+          scene_id,
+          title,
+          description,
+          link_url,
+          position_x,
+          position_y,
+          position_z,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+        [
+          crypto.randomUUID(),
+          scene.id,
+          placement.title,
+          placement.description,
+          placement.linkUrl || null,
+          placement.position.x,
+          placement.position.y,
+          placement.position.z,
           now,
           now,
         ],
       );
     }
-
-    await db.run(
-      `
-        INSERT INTO audio_placements (
-          id,
-          scene_id,
-          audio_file_id,
-          name,
-          position_x,
-          position_y,
-          position_z,
-          rotation_x,
-          rotation_y,
-          rotation_z,
-          gain,
-          loop_enabled,
-          created_at,
-          updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      [
-        crypto.randomUUID(),
-        scene.id,
-        audioFileId,
-        placement.name,
-        placement.position.x,
-        placement.position.y,
-        placement.position.z,
-        placement.rotation.x,
-        placement.rotation.y,
-        placement.rotation.z,
-        placement.gain,
-        placement.loop ? 1 : 0,
-        now,
-        now,
-      ],
-    );
   }
 
-  const rows = await db.all<AudioPlacementRow>(
-    `
-      SELECT
-        ap.id,
-        ap.scene_id,
-        ap.audio_file_id,
-        ap.name,
-        af.url,
-        af.original_filename,
-        af.mime_type,
-        af.byte_size,
-        ap.position_x,
-        ap.position_y,
-        ap.position_z,
-        ap.rotation_x,
-        ap.rotation_y,
-        ap.rotation_z,
-        ap.gain,
-        ap.loop_enabled
-      FROM audio_placements ap
-      INNER JOIN audio_files af
-        ON af.id = ap.audio_file_id
-      WHERE ap.scene_id = ?
-      ORDER BY COALESCE(ap.name, af.original_filename, af.url) ASC, ap.id ASC
-    `,
-    [scene.id],
+  return (
+    (await listScenePlacementsForSceneIdActor(input.sceneId, {
+      userId: input.actorUserId,
+      roles: input.actorRoles,
+    })) ?? []
   );
-
-  return rows.map(mapAudioPlacementRow);
 }
 
 export async function listManageableOrganizationsForUser(input: {
@@ -1211,7 +1363,6 @@ export async function listManageableOrganizationsForUser(input: {
       INNER JOIN organizations g
         ON g.id = gm.organization_id
       WHERE gm.user_id = ?
-        AND gm.role IN ('admin', 'editor')
       ORDER BY g.name ASC
     `,
     [input.userId],
@@ -1222,25 +1373,23 @@ export async function listAllOrganizations(): Promise<OrganizationCatalogEntry[]
   const db = await ensureAuthSchema();
   return db.all<OrganizationCatalogEntry>(
     `
-      SELECT id, name, description
+      SELECT id, name, description, logo_url AS logoUrl
       FROM organizations
       ORDER BY name ASC
     `,
   );
 }
 
-export async function getSceneForEdit(sceneId: string): Promise<
-  | {
-      id: string;
-      organizationId: string;
-      name: string;
-      description: string | null;
-      shared: boolean;
-      roomPlyUrl: string | null;
-      roomGlbUrl: string | null;
-    }
-  | null
-> {
+export async function getSceneForEdit(sceneId: string): Promise<{
+  id: string;
+  organizationId: string;
+  name: string;
+  description: string | null;
+  shared: boolean;
+  roomPlyUrl: string | null;
+  roomGlbUrl: string | null;
+  initialView: AppSceneSummary["initialView"];
+} | null> {
   const db = await ensureAuthSchema();
   const row = await db.first<SceneSummaryRow>(
     `
@@ -1251,7 +1400,13 @@ export async function getSceneForEdit(sceneId: string): Promise<
         description,
         shared,
         room_ply_url,
-        room_glb_url
+        room_glb_url,
+        initial_camera_x,
+        initial_camera_y,
+        initial_camera_z,
+        initial_target_x,
+        initial_target_y,
+        initial_target_z
       FROM scenes
       WHERE id = ?
     `,
@@ -1270,6 +1425,7 @@ export async function getSceneForEdit(sceneId: string): Promise<
     shared: row.shared === 1,
     roomPlyUrl: row.room_ply_url,
     roomGlbUrl: row.room_glb_url,
+    initialView: mapSceneInitialView(row),
   };
 }
 
@@ -1295,7 +1451,6 @@ async function canManageOrganization(input: {
       FROM organization_memberships
       WHERE user_id = ?
         AND organization_id = ?
-        AND role IN ('admin', 'editor')
       LIMIT 1
     `,
     [input.userId, input.organizationId],
@@ -1307,8 +1462,16 @@ async function canManageOrganization(input: {
 export async function createOrganization(input: {
   name: string;
   description: string | null;
+  logoUrl: string | null;
   createdByUserId: string;
+  actorRoles: string[];
 }): Promise<string> {
+  const creatorRole = getPrimaryRole(input.actorRoles);
+
+  if (!creatorRole || (creatorRole !== "admin" && creatorRole !== "editor")) {
+    throw new Error("Only admins or editors can create organizations");
+  }
+
   const db = await ensureAuthSchema();
   const now = new Date().toISOString();
   const organizationId = await generateUniqueShortId(async (candidate) => {
@@ -1331,19 +1494,20 @@ export async function createOrganization(input: {
         id,
         name,
         description,
+        logo_url,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?)
     `,
-    [organizationId, input.name.trim(), input.description, now, now],
+    [organizationId, input.name.trim(), input.description, input.logoUrl, now, now],
   );
 
   await db.run(
     `
       INSERT INTO organization_memberships (user_id, organization_id, role, created_at)
-      VALUES (?, ?, 'admin', ?)
+      VALUES (?, ?, ?, ?)
     `,
-    [input.createdByUserId, organizationId, now],
+    [input.createdByUserId, organizationId, creatorRole, now],
   );
 
   return organizationId;
@@ -1500,6 +1664,124 @@ export async function updateScene(input: {
   );
 }
 
+export async function updateSceneShared(input: {
+  sceneId: string;
+  shared: boolean;
+  actorUserId: string;
+  actorRoles: string[];
+}): Promise<void> {
+  const db = await ensureAuthSchema();
+  const scene = await db.first<{ organization_id: string }>(
+    `
+      SELECT organization_id
+      FROM scenes
+      WHERE id = ?
+      LIMIT 1
+    `,
+    [input.sceneId],
+  );
+
+  if (!scene) {
+    throw new Error("Scene not found");
+  }
+
+  const allowed = await canManageOrganization({
+    userId: input.actorUserId,
+    roles: input.actorRoles,
+    organizationId: scene.organization_id,
+  });
+
+  if (!allowed) {
+    throw new Error("Forbidden");
+  }
+
+  await db.run(
+    `
+      UPDATE scenes
+      SET
+        shared = ?,
+        updated_at = ?
+      WHERE id = ?
+    `,
+    [input.shared ? 1 : 0, new Date().toISOString(), input.sceneId],
+  );
+}
+
+export async function updateSceneInitialView(input: {
+  sceneId: string;
+  actorUserId: string;
+  actorRoles: string[];
+  initialView: {
+    position: {
+      x: number;
+      y: number;
+      z: number;
+    };
+    target: {
+      x: number;
+      y: number;
+      z: number;
+    };
+  };
+}): Promise<void> {
+  const db = await ensureAuthSchema();
+  const scene = await db.first<{ id: string; organization_id: string }>(
+    `
+      SELECT id, organization_id
+      FROM scenes
+      WHERE id = ?
+      LIMIT 1
+    `,
+    [input.sceneId],
+  );
+
+  if (!scene) {
+    throw new Error("Scene not found");
+  }
+
+  const allowed = await canManageOrganization({
+    userId: input.actorUserId,
+    roles: input.actorRoles,
+    organizationId: scene.organization_id,
+  });
+
+  if (!allowed) {
+    throw new Error("Forbidden");
+  }
+
+  const { position, target } = input.initialView;
+  const values = [position.x, position.y, position.z, target.x, target.y, target.z];
+
+  if (!values.every((value) => Number.isFinite(value))) {
+    throw new Error("Invalid initial view");
+  }
+
+  await db.run(
+    `
+      UPDATE scenes
+      SET
+        initial_camera_x = ?,
+        initial_camera_y = ?,
+        initial_camera_z = ?,
+        initial_target_x = ?,
+        initial_target_y = ?,
+        initial_target_z = ?,
+        updated_at = ?
+      WHERE id = ?
+    `,
+    [
+      position.x,
+      position.y,
+      position.z,
+      target.x,
+      target.y,
+      target.z,
+      new Date().toISOString(),
+      input.sceneId,
+    ],
+  );
+}
+
 export async function deleteScene(input: {
   sceneId: string;
   actorUserId: string;
@@ -1515,10 +1797,7 @@ export async function deleteScene(input: {
 
 export async function replaceUserOrganizationMemberships(input: {
   userId: string;
-  memberships: {
-    organizationId: string;
-    role: string;
-  }[];
+  organizationIds: string[];
 }): Promise<AppUserDirectoryEntry | null> {
   const db = await ensureAuthSchema();
   const user = await getUserRowById(input.userId);
@@ -1527,32 +1806,27 @@ export async function replaceUserOrganizationMemberships(input: {
     return null;
   }
 
+  const userRoles = await listUserRoles(input.userId);
+  const inheritedRole = getPrimaryRole(userRoles) ?? "viewer";
   const now = new Date().toISOString();
   const dedupedMemberships = Array.from(
     new Map(
-      input.memberships
-        .map((membership) => ({
-          organizationId: membership.organizationId,
-          role: normalizeRole(membership.role),
-        }))
-        .filter(
-          (membership) =>
-            membership.organizationId.trim().length > 0 &&
-            ["admin", "editor", "viewer"].includes(membership.role),
-        )
-        .map((membership) => [membership.organizationId, membership]),
+      input.organizationIds
+        .map((organizationId) => organizationId.trim())
+        .filter((organizationId) => organizationId.length > 0)
+        .map((organizationId) => [organizationId, organizationId]),
     ).values(),
   );
 
   await db.run("DELETE FROM organization_memberships WHERE user_id = ?", [input.userId]);
 
-  for (const membership of dedupedMemberships) {
+  for (const organizationId of dedupedMemberships) {
     await db.run(
       `
         INSERT INTO organization_memberships (user_id, organization_id, role, created_at)
         VALUES (?, ?, ?, ?)
       `,
-      [input.userId, membership.organizationId, membership.role, now],
+      [input.userId, organizationId, inheritedRole, now],
     );
   }
 
@@ -1562,8 +1836,7 @@ export async function replaceUserOrganizationMemberships(input: {
       SELECT
         gm.user_id,
         gm.organization_id,
-        g.name AS organization_name,
-        gm.role
+        g.name AS organization_name
       FROM organization_memberships gm
       INNER JOIN organizations g
         ON g.id = gm.organization_id
@@ -1582,7 +1855,6 @@ export async function replaceUserOrganizationMemberships(input: {
     organizations: membershipRows.map((row) => ({
       organizationId: row.organization_id,
       organizationName: row.organization_name,
-      role: normalizeRole(row.role ?? "viewer"),
     })),
   };
 }
@@ -1600,13 +1872,7 @@ export async function upsertGoogleUser(input: UpsertGoogleUserInput): Promise<Ap
           SET email = ?, display_name = ?, avatar_url = ?, updated_at = ?
           WHERE id = ?
         `,
-      [
-        input.email,
-        input.displayName ?? null,
-        input.avatarUrl ?? null,
-        now,
-        existingUser.id,
-      ],
+      [input.email, input.displayName ?? null, input.avatarUrl ?? null, now, existingUser.id],
     );
 
     await db.run(
@@ -1626,15 +1892,7 @@ export async function upsertGoogleUser(input: UpsertGoogleUserInput): Promise<Ap
           provider_email = excluded.provider_email,
           updated_at = excluded.updated_at
       `,
-      [
-        crypto.randomUUID(),
-        existingUser.id,
-        provider,
-        input.googleSub,
-        input.email,
-        now,
-        now,
-      ],
+      [crypto.randomUUID(), existingUser.id, provider, input.googleSub, input.email, now, now],
     );
 
     const roles = await listUserRoles(existingUser.id);

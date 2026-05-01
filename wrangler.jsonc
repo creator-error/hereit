@@ -1,35 +1,39 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "hereit",
-  "main": ".open-next/worker.js",
-  "compatibility_date": "2026-04-16",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
-  "vars": {
-    // Runtime vars. Secrets such as AUTH_SECRET and OAuth client secrets
-    // should be stored with `wrangler secret put`, not committed here.
-    "NEXTAUTH_URL": "https://hereit.aokayama-work.workers.dev/auth",
-    "NEXT_PUBLIC_APP_URL": "https://hereit.aokayama-work.workers.dev"
-  },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "hereit",
-      "database_id": "6f34c2d1-a379-44bf-a6b9-6005996ac466"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "ASSET_BUCKET",
-      "bucket_name": "hereit"
-    }
-  ],
-  "assets": {
-    "directory": ".open-next/assets",
-    "binding": "ASSETS"
-  },
-  "observability": {
-    "enabled": true
-  }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "hereit",
+	"main": ".open-next/worker.js",
+	"compatibility_date": "2026-04-16",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"vars": {
+		// Runtime vars. Secrets such as AUTH_SECRET and OAuth client secrets
+		// should be stored with `wrangler secret put`, not committed here.
+		"NEXTAUTH_URL": "https://hereit.aokayama-work.workers.dev/auth",
+		"NEXT_PUBLIC_APP_URL": "https://hereit.aokayama-work.workers.dev"
+	},
+	"d1_databases": [
+		{
+			"binding": "hereit",
+			"database_name": "hereit",
+			"database_id": "deec0664-0e44-4cb2-b6e2-60b6d65e9755",
+			"remote": true
+		}
+	],
+	// R2 binding is not required by the current implementation because the app
+	// stores direct asset URLs in DB. Add this back if upload or proxy delivery
+	// is reintroduced.
+	// "r2_buckets": [
+	//   {
+	//     "binding": "ASSET_BUCKET",
+	//     "bucket_name": "hereit"
+	//   }
+	// ],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	"observability": {
+		"enabled": true
+	}
 }
