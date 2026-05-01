@@ -3,7 +3,7 @@
 import { SceneMiniMap } from "@/features/spark-viewer/components/SceneMiniMap";
 import type { SparkScenePlacement } from "@/features/spark-viewer/sceneTypes";
 import { useViewerUiStore } from "@/features/spark-viewer/stores/viewerUiStore";
-import { ViewerTools } from "./ViewerTools";
+import { SceneTools } from "./SceneTools";
 
 type MovementControlKey = "forward" | "back" | "left" | "right" | "up" | "down";
 
@@ -30,7 +30,7 @@ export function ViewerHud({
         mapBounds={mapBounds}
         placements={placements}
       />
-      <ViewerTools
+      <SceneTools
         className="absolute right-[max(20px,env(safe-area-inset-right))] bottom-[max(32px,calc(env(safe-area-inset-bottom)+24px))] "
         setMovementControl={setMovementControl}
         endMovementControl={endMovementControl}

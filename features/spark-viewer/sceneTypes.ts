@@ -112,6 +112,7 @@ export type MovementControlKey = keyof Pick<
 >;
 
 export type SparkSceneProps = {
+  isSharedView?: boolean;
   collisionAssetUrl?: string | null;
   initialView?: SceneInitialView | null;
   placements?: SparkScenePlacement[];

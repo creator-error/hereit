@@ -42,6 +42,7 @@ import { useViewerUiStore } from "@/features/spark-viewer/stores/viewerUiStore";
 export type { ViewerLoadingState } from "@/features/spark-viewer/sceneTypes";
 
 export function SparkScene({
+  isSharedView = false,
   collisionAssetUrl = COLLISION_ASSET_URL,
   initialView = null,
   placements,
@@ -765,7 +766,9 @@ export function SparkScene({
         audio.setMaxDistance(source.maxDistance ?? 5.8);
         audio.setRolloffFactor(source.rolloffFactor ?? 1.7);
         holder.add(audio);
-        holder.add(createPlacementMarker("audio", source.selected === true));
+        if (!isSharedView) {
+          holder.add(createPlacementMarker("audio", source.selected === true));
+        }
         placementGroup.add(holder);
         positionalAudioRef.current.push(audio);
 
@@ -1168,9 +1171,7 @@ export function SparkScene({
         placements={placementsRef.current ?? []}
         setMovementControl={setMovementControl}
         endMovementControl={endMovementControl}
-        setSoundEnabled={(enabled) => {
-          onSoundEnabledChange?.(enabled);
-        }}
+        setSoundEnabled={(enabled) => onSoundEnabledChange?.(enabled)}
       />
     </div>
   );

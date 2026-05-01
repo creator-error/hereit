@@ -20,7 +20,7 @@ const variantClasses: Record<ButtonVariant, string> = {
     "border border-[rgba(212,175,55,0.3)] bg-[linear-gradient(180deg,rgba(26,31,40,0.92),rgba(15,19,28,0.9))] text-white shadow-[0_18px_32px_rgba(0,0,0,0.34)] backdrop-blur-[12px] hover:border-[rgba(212,175,55,0.55)]",
   secondary:
     "border border-white/12 bg-white/6 text-white hover:bg-white/10 disabled:text-white/40",
-  ghost: "text-white/76 hover:bg-white/10 border border-white/12 bg-white/6 disabled:text-white/40",
+  ghost: "text-white/76 hover:bg-white/10  disabled:text-white/40",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
